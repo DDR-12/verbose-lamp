@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>像素机甲对战 · Mech Pixel Arena</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="title-bar">
+      <h1>PIXEL MECH ARENA</h1>
+      <p class="subtitle">两名驾驶员，请就位 — 复古像素风机甲对战</p>
+    </header>
+
+    <!-- HUD：血量 / 回合信息 -->
+    <div class="hud">
+      <div class="hp-box p1">
+        <div class="hp-name">P1 · 赤红烈焰 RED BLAZE</div>
+        <div class="hp-bar"><div id="hp1" class="hp-fill"></div></div>
+        <div class="hp-text"><span id="hp1-text">100</span> / 100</div>
+      </div>
+
+      <div class="vs">
+        <div class="round">ROUND <span id="round">1</span></div>
+        <div class="clock" id="clock">60</div>
+      </div>
+
+      <div class="hp-box p2">
+        <div class="hp-name">P2 · 苍蓝雷霆 AZURE THUNDER</div>
+        <div class="hp-bar"><div id="hp2" class="hp-fill"></div></div>
+        <div class="hp-text"><span id="hp2-text">100</span> / 100</div>
+      </div>
+    </div>
+
+    <!-- 游戏画布 -->
+    <div class="stage">
+      <canvas id="game" width="960" height="480"></canvas>
+      <div id="overlay" class="overlay hidden">
+        <div class="overlay-card">
+          <h2 id="overlay-title">READY</h2>
+          <p id="overlay-sub">按 空格 / Enter 开始</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 控制面板：操作说明 -->
+    <section class="controls">
+      <div class="panel">
+        <h3>P1 控制</h3>
+        <ul>
+          <li><b>A / D</b> 左右移动</li>
+          <li><b>W</b> 跳跃</li>
+          <li><b>S</b> 防御 (格挡)</li>
+          <li><b>J</b> 近战拳</li>
+          <li><b>K</b> 远程脉冲</li>
+        </ul>
+      </div>
+
+      <div class="panel center">
+        <h3>规则</h3>
+        <ul>
+          <li>每局 60 秒，血量归零或时间到时血量低者败北</li>
+          <li>防御时减伤 70%，但无法攻击</li>
+          <li>近战伤害高、脉冲消耗冷却，可牵制走位</li>
+          <li><b>R</b> 重新开始 · <b>P</b> 暂停</li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <h3>P2 控制</h3>
+        <ul>
+          <li><b>← →</b> 左右移动</li>
+          <li><b>↑</b> 跳跃</li>
+          <li><b>↓</b> 防御 (格挡)</li>
+          <li><b>Num1</b> 近战拳</li>
+          <li><b>Num2</b> 远程脉冲</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>PIXEL MECH ARENA · Demo v0.1</span>
+      <span id="state-tag">准备中</span>
+    </footer>
+  </div>
+
+  <script src="game.js" defer></script>
+</body>
+</html>
