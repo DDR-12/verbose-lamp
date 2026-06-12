@@ -6,14 +6,20 @@ import { BLOCKS, HOTBAR, SlotKind, TOOLS, slotLabel, BlockType } from '../game/b
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<MinecraftEngine | null>(null);
+
   const [hotbarIdx, setHotbarIdx] = useState(0);
   const [pointerLocked, setPointerLocked] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);  // 用户至少点过一次"开始"
+  const [hasStarted, setHasStarted] = useState(false);
   const [mode, setMode] = useState<'walk' | 'fly'>('walk');
   const [breakInfo, setBreakInfo] = useState<{ pos: { x: number; y: number; z: number } | null; progress: number }>({
     pos: null, progress: 0,
   });
+  const [debug, setDebug] = useState<{
+    pos: { x: number; y: number; z: number }; keys: string[];
+    onGround: boolean; hasMesh: boolean; yaw: number; pitch: number;
+  }>({ pos: { x: 0, y: 0, z: 0 }, keys: [], onGround: false, hasMesh: false, yaw: 0, pitch: 0 });
   const [webglOk, setWebglOk] = useState(true);
+  const [engineError, setEngineError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -25,46 +31,48 @@ export default function Home() {
         onModeChange: (m) => setMode(m),
         onPointerLockChange: (locked) => setPointerLocked(locked),
         onBreakProgress: (pos, progress) => setBreakInfo({ pos, progress }),
+        onDebug: (d) => setDebug(d),
       });
-    } catch (err) {
-      console.warn('Failed to start engine:', err);
+    } catch (err: any) {
+      console.warn('启动引擎出错:', err);
+      setEngineError(err?.message || '未知错误');
       setWebglOk(false);
       return;
     }
     engineRef.current = engine;
-
-    const onMouseMove = (e: MouseEvent) => engine.handleMouseMove(e);
-    window.addEventListener('mousemove', onMouseMove);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      engine.dispose();
-    };
+    return () => { engine.dispose(); };
   }, []);
 
   const handleStart = () => {
     setHasStarted(true);
-    // 强制开启自由视角，确保即使 pointer lock 失败也能用方向键和屏幕按钮移动
+    // 强制开放方向键视角，即使 pointer lock 失败
     engineRef.current?.forceFreeLook();
-    // 同时尝试请求指针锁（可能成功也可能失败，都无所谓）
+    // 同时尝试请求指针锁定
     engineRef.current?.tryRequestPointerLock();
   };
 
+  const handleToggleMode = () => {
+    // 通过发送一次 F 键切换模式
+    engineRef.current?.pressKey('KeyF');
+    setTimeout(() => engineRef.current?.releaseKey('KeyF'), 10);
+  };
+
+  const handleRespawn = () => engineRef.current?.respawn();
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#87ceeb] select-none font-sans text-white">
-      {/* Three.js canvas 容器 */}
       <div ref={containerRef} className="absolute inset-0" />
 
       {/* 十字准星 */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="relative w-6 h-6">
+        <div className="relative w-7 h-7">
           <div className="absolute left-1/2 top-0 w-[2px] h-full -translate-x-1/2 bg-white mix-blend-difference shadow" />
           <div className="absolute top-1/2 left-0 h-[2px] w-full -translate-y-1/2 bg-white mix-blend-difference shadow" />
         </div>
       </div>
 
-      {/* 左上角：标题 + 模式 + 指针状态 */}
-      <div className="pointer-events-none absolute top-4 left-4 text-sm leading-relaxed drop-shadow">
+      {/* 左上角标题 + 状态 */}
+      <div className="pointer-events-none absolute top-4 left-4 text-sm leading-relaxed drop-shadow max-w-xs">
         <div className="text-2xl font-black tracking-wider">
           <span className="text-lime-300">我的</span>
           <span className="text-amber-200">世界</span>
@@ -72,25 +80,20 @@ export default function Home() {
         </div>
         <div className="mt-1 inline-flex items-center gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10">
           <span className={`w-2 h-2 rounded-full ${pointerLocked ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-          {pointerLocked
-            ? '鼠标已锁定（按 ESC 退出）'
-            : hasStarted
-              ? '鼠标未锁定，可用方向键转视角，或再次点"开始"尝试锁定'
-              : '点击下方按钮开始'}
+          {pointerLocked ? '鼠标已锁定（按 ESC 退出）' : '鼠标未锁定 · 使用方向键转视角'}
         </div>
         <div className="mt-1 inline-flex items-center gap-2 bg-black/30 rounded px-2 py-0.5 border border-white/10">
           模式：<b className={mode === 'fly' ? 'text-cyan-300' : 'text-emerald-300'}>{mode === 'fly' ? '飞行' : '走路'}</b>
-          <span className="text-white/60 text-xs">(F 切换)</span>
         </div>
       </div>
 
-      {/* 右上角：操作说明 */}
+      {/* 右上角操作说明 */}
       <div className="pointer-events-none absolute top-4 right-4 text-right text-xs leading-relaxed bg-black/40 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/10 max-w-xs">
         <div className="text-white/90 font-semibold mb-1">操作</div>
         <div><kbd className="kbd">WASD</kbd> 移动</div>
-        <div><kbd className="kbd">鼠标</kbd> / <kbd className="kbd">方向键</kbd> 视角</div>
+        <div><kbd className="kbd">方向键</kbd> 转视角</div>
+        <div><kbd className="kbd">鼠标</kbd> 锁定后转视角</div>
         <div><kbd className="kbd">Space</kbd> 跳跃 / 飞高</div>
-        <div><kbd className="kbd">Shift</kbd> 下降（飞行中）</div>
         <div><kbd className="kbd">F</kbd> 切换走路 / 飞行</div>
         <div><kbd className="kbd">左键按住</kbd> 破坏方块</div>
         <div><kbd className="kbd">右键</kbd> 放置方块</div>
@@ -123,108 +126,130 @@ export default function Home() {
       <div className="pointer-events-none absolute bottom-[170px] left-1/2 -translate-x-1/2 text-xs text-white/80 bg-black/30 px-3 py-1 rounded-full border border-white/10">
         {(() => {
           const s = HOTBAR[hotbarIdx];
-          if (s.kind === 'tool') return `⚒ 工具：${TOOLS[s.type].label}（更快破坏对应方块）`;
-          return `🧱 方块：${BLOCKS[s.type as BlockType].label}（右键放置）`;
+          if (s.kind === 'tool') return `⚒ ${TOOLS[s.type].label}`;
+          return `🧱 ${BLOCKS[s.type as BlockType].label}`;
         })()}
       </div>
 
-      {/* ===== 屏幕虚拟按钮（保证任何环境都能操作）===== */}
+      {/* 屏幕虚拟按钮（开始游戏后出现） */}
       {hasStarted && (
         <>
-          {/* 移动摇杆区域 — 左下角 */}
-          <div className="absolute bottom-24 left-6 pointer-events-auto">
+          {/* 左下角：WASD + 跳 */}
+          <div className="absolute bottom-28 left-6 select-none">
             <div className="flex flex-col items-center gap-1">
-              {/* W 按钮 */}
-              <ScreenBtn label="W" code="KeyW" engine={engineRef} />
+              <StickBtn label="W" code="KeyW" engine={engineRef} />
               <div className="flex gap-1">
-                <ScreenBtn label="A" code="KeyA" engine={engineRef} />
-                <ScreenBtn label="S" code="KeyS" engine={engineRef} />
-                <ScreenBtn label="D" code="KeyD" engine={engineRef} />
+                <StickBtn label="A" code="KeyA" engine={engineRef} />
+                <StickBtn label="S" code="KeyS" engine={engineRef} />
+                <StickBtn label="D" code="KeyD" engine={engineRef} />
+              </div>
+              <div className="mt-2">
+                <StickBtn label="跳" code="Space" engine={engineRef} />
               </div>
             </div>
           </div>
 
-          {/* 视角按钮区域 — 右下角（方向键） */}
-          <div className="absolute bottom-24 right-6 pointer-events-auto">
+          {/* 右下角：方向键 + 破坏/放置 */}
+          <div className="absolute bottom-28 right-6 select-none">
             <div className="flex flex-col items-center gap-1">
-              <ScreenBtn label="↑" code="ArrowUp" engine={engineRef} />
+              <StickBtn label="↑" code="ArrowUp" engine={engineRef} />
               <div className="flex gap-1">
-                <ScreenBtn label="←" code="ArrowLeft" engine={engineRef} />
-                <ScreenBtn label="↓" code="ArrowDown" engine={engineRef} />
-                <ScreenBtn label="→" code="ArrowRight" engine={engineRef} />
+                <StickBtn label="←" code="ArrowLeft" engine={engineRef} />
+                <StickBtn label="↓" code="ArrowDown" engine={engineRef} />
+                <StickBtn label="→" code="ArrowRight" engine={engineRef} />
               </div>
             </div>
           </div>
 
-          {/* 跳跃按钮 — 左下，摇杆上方 */}
-          <div className="absolute bottom-[200px] left-6 pointer-events-auto">
-            <ScreenBtn label="跳" code="Space" engine={engineRef} size="sm" />
-          </div>
-
-          {/* 放置 / 破坏按钮 — 右下，方向键上方 */}
-          <div className="absolute bottom-[200px] right-6 pointer-events-auto flex gap-2">
+          {/* 破坏 / 放置按钮 — 右下 */}
+          <div className="absolute bottom-[260px] right-6 flex gap-2 select-none">
             <button
               onPointerDown={() => engineRef.current?.startBreak()}
               onPointerUp={() => engineRef.current?.endBreak()}
               onPointerLeave={() => engineRef.current?.endBreak()}
-              className="w-12 h-10 rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 text-white font-bold text-sm shadow border border-white/20 select-none transition"
+              className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 text-white font-bold text-sm shadow border border-white/20 transition"
             >
               破坏
             </button>
             <button
               onClick={() => engineRef.current?.placeBlock()}
-              className="w-12 h-10 rounded-lg bg-amber-600/80 hover:bg-amber-500 active:bg-amber-700 text-white font-bold text-sm shadow border border-white/20 select-none transition"
+              className="px-4 py-2 rounded-lg bg-amber-600/80 hover:bg-amber-500 active:bg-amber-700 text-white font-bold text-sm shadow border border-white/20 transition"
             >
               放置
+            </button>
+          </div>
+
+          {/* 左下 — 工具按钮（模式切换/重生） */}
+          <div className="absolute bottom-[260px] left-6 flex flex-col gap-2 select-none">
+            <button
+              onClick={handleToggleMode}
+              className="px-4 py-2 rounded-lg bg-cyan-700/80 hover:bg-cyan-600 text-white font-bold text-sm shadow border border-white/20 transition"
+            >
+              切换：{mode === 'fly' ? '走路' : '飞行'}
+            </button>
+            <button
+              onClick={handleRespawn}
+              className="px-4 py-2 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-sm shadow border border-white/20 transition"
+            >
+              重生
             </button>
           </div>
         </>
       )}
 
-      {/* 开始游戏的大按钮 —— 这是真实可点击元素 */}
+      {/* 调试面板（开始后出现） */}
+      {hasStarted && (
+        <div className="pointer-events-none absolute top-24 left-4 text-xs bg-black/50 rounded-lg px-3 py-2 border border-white/20 min-w-[240px]">
+          <div className="font-bold mb-1 text-yellow-300">调试</div>
+          <div>pos: {debug.pos.x.toFixed(1)}, {debug.pos.y.toFixed(1)}, {debug.pos.z.toFixed(1)}</div>
+          <div>yaw: {debug.yaw.toFixed(2)} · pitch: {debug.pitch.toFixed(2)}</div>
+          <div>ground: {String(debug.onGround)} · mesh: {String(debug.hasMesh)}</div>
+          <div className="text-emerald-300">keys: {debug.keys.length > 0 ? debug.keys.join(',') : '(空)'}</div>
+        </div>
+      )}
+
+      {/* 开始游戏大按钮 */}
       {!hasStarted && webglOk && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-black/30 to-black/50 backdrop-blur-sm">
-          <div className="bg-black/60 rounded-3xl px-10 py-8 border-2 border-white/20 text-center shadow-2xl max-w-md">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-black/30 to-black/60 backdrop-blur-sm">
+          <div className="bg-black/70 rounded-3xl px-10 py-8 border-2 border-white/20 text-center shadow-2xl max-w-md">
             <div className="text-4xl font-black mb-3">
               <span className="text-lime-300">我的</span>
               <span className="text-amber-200">世界</span>
             </div>
-            <div className="text-sm text-white/80 mb-5">
+            <div className="text-sm text-white/80 mb-6 leading-relaxed">
               在浏览器里亲手体验破坏、建造、自由探索。
+              <br />
+              <span className="text-amber-300">任何环境都能玩：</span> 键盘 / 鼠标 / 屏幕按钮
             </div>
             <button
               onClick={handleStart}
-              className="pointer-events-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-lime-500 hover:bg-lime-400 active:scale-95 text-black font-bold text-lg shadow-lg shadow-lime-900/50 transition"
+              className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-lime-500 hover:bg-lime-400 active:scale-95 text-black font-bold text-lg shadow-lg shadow-lime-900/60 transition"
             >
               🎮 点击开始游戏
             </button>
-            <div className="mt-4 text-xs text-white/60 leading-relaxed">
-              点击后浏览器会尝试锁定鼠标以便转动视角。<br />
-              若无法锁定鼠标，也可直接使用 <kbd className="kbd">方向键</kbd> / <kbd className="kbd">WASD</kbd> 游玩。
+            <div className="mt-5 text-xs text-white/60 leading-relaxed">
+              提示：
+              <br />
+              · WASD 移动，方向键转视角
+              <br />
+              · 鼠标指针锁定后可用鼠标转视角（点击画面尝试）
+              <br />
+              · 左键按住破坏，右键放置方块
             </div>
           </div>
         </div>
       )}
 
-      {/* 已开始但未锁定鼠标 —— 小提示 + 重新锁定按钮 */}
-      {hasStarted && !pointerLocked && webglOk && (
-        <div className="absolute top-[calc(50%-60px)] left-1/2 -translate-x-1/2 pointer-events-none">
-          <button
-            onClick={handleStart}
-            className="pointer-events-auto inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg bg-amber-500/90 hover:bg-amber-400 text-black font-bold shadow-lg transition"
-          >
-            🔒 重新锁定鼠标
-          </button>
-        </div>
-      )}
-
+      {/* WebGL 失败提示 */}
       {!webglOk && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="rounded-2xl px-10 py-8 border border-red-400/40 text-center max-w-md shadow-2xl">
-            <div className="text-3xl font-bold mb-3 text-red-300">⛔ WebGL 不可用</div>
-            <div className="text-sm text-white/80">
+            <div className="text-3xl font-bold mb-3 text-red-300">⛔ 无法启动</div>
+            <div className="text-sm text-white/80 leading-relaxed">
               当前环境禁用了 WebGL，无法启动 3D 游戏。
-              <br />请在桌面浏览器（Chrome / Edge / Firefox / Safari）中打开此页面。
+              <br />
+              请在桌面浏览器（Chrome / Edge / Firefox / Safari）中打开此页面。
+              {engineError && <div className="mt-3 text-xs text-red-300 font-mono break-all">{engineError}</div>}
             </div>
           </div>
         </div>
@@ -244,11 +269,7 @@ function HotbarSlot({ slot, index, active }: { slot: SlotKind; index: number; ac
       }
     >
       <div className="flex-1 w-full flex items-center justify-center">
-        {slot.kind === 'tool' ? (
-          <ToolIcon type={slot.type} />
-        ) : (
-          <BlockIcon type={slot.type} />
-        )}
+        {slot.kind === 'tool' ? <ToolIcon type={slot.type} /> : <BlockIcon type={slot.type} />}
       </div>
       <div className="absolute top-0.5 left-1.5 text-[11px] font-bold text-white/90">{index + 1}</div>
       <div className="absolute bottom-0.5 w-full text-center text-[9px] text-white/90 font-medium">
@@ -258,7 +279,6 @@ function HotbarSlot({ slot, index, active }: { slot: SlotKind; index: number; ac
   );
 }
 
-/** 3D 方块图标（由三个可见面的斜角矩形组成） */
 function BlockIcon({ type }: { type: BlockType }) {
   const color = BLOCKS[type].color;
   const top = lighten(color, 0.18);
@@ -276,37 +296,38 @@ function BlockIcon({ type }: { type: BlockType }) {
 function ToolIcon({ type }: { type: 'axe' | 'pickaxe' | 'shovel' | 'sword' }) {
   const handle = '#8b5a2b';
   const head = '#c9c9c9';
-  const accentHex = '#' + TOOLS[type].color.toString(16).padStart(6, '0');
+  if (type === 'axe') {
+    return (
+      <svg width="32" height="32" viewBox="0 0 30 32">
+        <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
+        <polygon points="6,4 20,2 22,14 10,18" fill={head} stroke="#00000066" strokeWidth="0.6" />
+        <polygon points="6,4 12,6 10,18 8,16" fill="#ffd9a0" opacity="0.85" stroke="#00000055" strokeWidth="0.5" />
+      </svg>
+    );
+  }
+  if (type === 'pickaxe') {
+    return (
+      <svg width="32" height="32" viewBox="0 0 30 32">
+        <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
+        <polygon points="2,8 28,4 26,10 4,14" fill={head} stroke="#00000066" strokeWidth="0.6" />
+        <polygon points="10,6 20,6 18,12 12,12" fill="#ffd9a0" stroke="#00000055" strokeWidth="0.5" />
+      </svg>
+    );
+  }
+  if (type === 'shovel') {
+    return (
+      <svg width="32" height="32" viewBox="0 0 30 32">
+        <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
+        <polygon points="7,2 23,2 20,14 10,14" fill={head} stroke="#00000066" strokeWidth="0.6" />
+        <polygon points="10,4 20,4 19,12 11,12" fill="#ffd9a0" stroke="#00000055" strokeWidth="0.5" />
+      </svg>
+    );
+  }
   return (
     <svg width="32" height="32" viewBox="0 0 30 32">
-      {type === 'axe' && (
-        <>
-          <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
-          <polygon points="6,4 20,2 22,14 10,18" fill={head} stroke="#00000066" strokeWidth="0.6" />
-          <polygon points="6,4 12,6 10,18 8,16" fill={accentHex} opacity="0.85" stroke="#00000055" strokeWidth="0.5" />
-        </>
-      )}
-      {type === 'pickaxe' && (
-        <>
-          <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
-          <polygon points="2,8 28,4 26,10 4,14" fill={head} stroke="#00000066" strokeWidth="0.6" />
-          <polygon points="10,6 20,6 18,12 12,12" fill={accentHex} stroke="#00000055" strokeWidth="0.5" />
-        </>
-      )}
-      {type === 'shovel' && (
-        <>
-          <rect x="12" y="14" width="3" height="14" fill={handle} stroke="#00000066" strokeWidth="0.5" />
-          <polygon points="7,2 23,2 20,14 10,14" fill={head} stroke="#00000066" strokeWidth="0.6" />
-          <polygon points="10,4 20,4 19,12 11,12" fill={accentHex} stroke="#00000055" strokeWidth="0.5" />
-        </>
-      )}
-      {type === 'sword' && (
-        <>
-          <polygon points="13,1 17,1 18,20 12,20" fill={head} stroke="#00000066" strokeWidth="0.6" />
-          <rect x="6" y="19" width="18" height="3" fill={accentHex} stroke="#00000055" strokeWidth="0.5" />
-          <rect x="12.5" y="22" width="4" height="8" fill={handle} stroke="#00000066" strokeWidth="0.5" />
-        </>
-      )}
+      <polygon points="13,1 17,1 18,20 12,20" fill={head} stroke="#00000066" strokeWidth="0.6" />
+      <rect x="6" y="19" width="18" height="3" fill="#ffd9a0" stroke="#00000055" strokeWidth="0.5" />
+      <rect x="12.5" y="22" width="4" height="8" fill={handle} stroke="#00000066" strokeWidth="0.5" />
     </svg>
   );
 }
@@ -325,40 +346,21 @@ function darken(hex: number, amount: number): string {
 }
 
 /** 屏幕虚拟按钮：按住触发按键，松开取消 */
-function ScreenBtn({
-  label,
-  code,
-  engine,
-  size = 'base',
-}: {
-  label: string;
-  code: string;
-  engine: React.RefObject<MinecraftEngine | null>;
-  size?: 'sm' | 'base';
-  onStart?: () => void;
-}) {
-  const w = size === 'sm' ? 'w-12' : 'w-14';
-  const h = size === 'sm' ? 'h-10' : 'h-12';
-  const text = size === 'sm' ? 'text-sm' : 'text-base';
+function StickBtn({ label, code, engine }: { label: string; code: string; engine: React.RefObject<MinecraftEngine | null> }) {
   return (
     <button
-      className={`${w} ${h} rounded-xl bg-white/20 hover:bg-white/30 active:bg-white/45 border border-white/30 text-white font-bold ${text} shadow backdrop-blur-sm select-none transition-all active:scale-90`}
+      className="w-14 h-14 rounded-xl bg-white/25 hover:bg-white/35 active:bg-white/50 border border-white/30 text-white font-bold shadow backdrop-blur-sm select-none transition-all active:scale-90 text-lg"
       onPointerDown={(e) => {
         e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
         engine.current?.pressKey(code);
       }}
       onPointerUp={(e) => {
-        e.currentTarget.releasePointerCapture(e.pointerId);
+        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
         engine.current?.releaseKey(code);
       }}
-      onPointerLeave={(e) => {
-        engine.current?.releaseKey(code);
-      }}
-      onPointerCancel={(e) => {
-        engine.current?.releaseKey(code);
-      }}
-      style={{ touchAction: 'none', WebkitTapHighlightColor: 'transparent' }}
+      onPointerLeave={() => engine.current?.releaseKey(code)}
+      onPointerCancel={() => engine.current?.releaseKey(code)}
     >
       {label}
     </button>
