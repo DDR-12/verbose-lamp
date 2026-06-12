@@ -44,6 +44,9 @@ export default function Home() {
 
   const handleStart = () => {
     setHasStarted(true);
+    // 强制开启自由视角，确保即使 pointer lock 失败也能用方向键和屏幕按钮移动
+    engineRef.current?.forceFreeLook();
+    // 同时尝试请求指针锁（可能成功也可能失败，都无所谓）
     engineRef.current?.tryRequestPointerLock();
   };
 
@@ -124,6 +127,59 @@ export default function Home() {
           return `🧱 方块：${BLOCKS[s.type as BlockType].label}（右键放置）`;
         })()}
       </div>
+
+      {/* ===== 屏幕虚拟按钮（保证任何环境都能操作）===== */}
+      {hasStarted && (
+        <>
+          {/* 移动摇杆区域 — 左下角 */}
+          <div className="absolute bottom-24 left-6 pointer-events-auto">
+            <div className="flex flex-col items-center gap-1">
+              {/* W 按钮 */}
+              <ScreenBtn label="W" code="KeyW" engine={engineRef} />
+              <div className="flex gap-1">
+                <ScreenBtn label="A" code="KeyA" engine={engineRef} />
+                <ScreenBtn label="S" code="KeyS" engine={engineRef} />
+                <ScreenBtn label="D" code="KeyD" engine={engineRef} />
+              </div>
+            </div>
+          </div>
+
+          {/* 视角按钮区域 — 右下角（方向键） */}
+          <div className="absolute bottom-24 right-6 pointer-events-auto">
+            <div className="flex flex-col items-center gap-1">
+              <ScreenBtn label="↑" code="ArrowUp" engine={engineRef} />
+              <div className="flex gap-1">
+                <ScreenBtn label="←" code="ArrowLeft" engine={engineRef} />
+                <ScreenBtn label="↓" code="ArrowDown" engine={engineRef} />
+                <ScreenBtn label="→" code="ArrowRight" engine={engineRef} />
+              </div>
+            </div>
+          </div>
+
+          {/* 跳跃按钮 — 左下，摇杆上方 */}
+          <div className="absolute bottom-[200px] left-6 pointer-events-auto">
+            <ScreenBtn label="跳" code="Space" engine={engineRef} size="sm" />
+          </div>
+
+          {/* 放置 / 破坏按钮 — 右下，方向键上方 */}
+          <div className="absolute bottom-[200px] right-6 pointer-events-auto flex gap-2">
+            <button
+              onPointerDown={() => engineRef.current?.startBreak()}
+              onPointerUp={() => engineRef.current?.endBreak()}
+              onPointerLeave={() => engineRef.current?.endBreak()}
+              className="w-12 h-10 rounded-lg bg-red-600/80 hover:bg-red-500 active:bg-red-700 text-white font-bold text-sm shadow border border-white/20 select-none transition"
+            >
+              破坏
+            </button>
+            <button
+              onClick={() => engineRef.current?.placeBlock()}
+              className="w-12 h-10 rounded-lg bg-amber-600/80 hover:bg-amber-500 active:bg-amber-700 text-white font-bold text-sm shadow border border-white/20 select-none transition"
+            >
+              放置
+            </button>
+          </div>
+        </>
+      )}
 
       {/* 开始游戏的大按钮 —— 这是真实可点击元素 */}
       {!hasStarted && webglOk && (
@@ -266,4 +322,45 @@ function darken(hex: number, amount: number): string {
   const g = Math.max(0, Math.floor(((hex >> 8) & 0xff) * (1 - amount)));
   const b = Math.max(0, Math.floor((hex & 0xff) * (1 - amount)));
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+/** 屏幕虚拟按钮：按住触发按键，松开取消 */
+function ScreenBtn({
+  label,
+  code,
+  engine,
+  size = 'base',
+}: {
+  label: string;
+  code: string;
+  engine: React.RefObject<MinecraftEngine | null>;
+  size?: 'sm' | 'base';
+  onStart?: () => void;
+}) {
+  const w = size === 'sm' ? 'w-12' : 'w-14';
+  const h = size === 'sm' ? 'h-10' : 'h-12';
+  const text = size === 'sm' ? 'text-sm' : 'text-base';
+  return (
+    <button
+      className={`${w} ${h} rounded-xl bg-white/20 hover:bg-white/30 active:bg-white/45 border border-white/30 text-white font-bold ${text} shadow backdrop-blur-sm select-none transition-all active:scale-90`}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        engine.current?.pressKey(code);
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        engine.current?.releaseKey(code);
+      }}
+      onPointerLeave={(e) => {
+        engine.current?.releaseKey(code);
+      }}
+      onPointerCancel={(e) => {
+        engine.current?.releaseKey(code);
+      }}
+      style={{ touchAction: 'none', WebkitTapHighlightColor: 'transparent' }}
+    >
+      {label}
+    </button>
+  );
 }

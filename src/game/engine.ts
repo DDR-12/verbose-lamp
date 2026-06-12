@@ -39,16 +39,30 @@ export class MinecraftEngine {
   private onGround = false;
   private mode: 'walk' | 'fly' = 'walk';
 
-  // 输入状态
-  private keys = new Set<string>();
-  private leftDown = false;   // 左键是否按住（用于持续破坏）
+  /** 公开引用：允许 UI 层直接设置/清除按键状态（屏幕按钮用） */
+  keys = new Set<string>();
+
+  /** 公开方法：UI 屏幕按钮按住时调用，模拟 keydown */
+  pressKey(code: string) {
+    this.keys.add(code);
+    this.onKeyDown({ code, preventDefault: () => {} } as any);
+  }
+  /** 公开方法：UI 屏幕按钮松开时调用，模拟 keyup */
+  releaseKey(code: string) {
+    this.keys.delete(code);
+    this.onKeyUp({ code } as any);
+  }
+
+  /** 强制开启自由视角模式（UI 可调用，确保总能用方向键/屏幕按钮） */
+  forceFreeLook() {
+    this.useArrowCamera = true;
+    this.callbacks.onPointerLockChange?.(false);
+  }
+
+  private leftDown = false;
   private hotbar: SlotKind[];
   private hotbarIndex = 0;
-  private yawAccum = 0;        // 非锁定模式下的视角输入累积
-  private pitchAccum = 0;
   private useArrowCamera = false;
-
-  // 破坏进度
   private breakTarget: { x: number; y: number; z: number } | null = null;
   private breakProgress = 0;
 
@@ -261,7 +275,7 @@ export class MinecraftEngine {
       this.leftDown = true;
       this.tryBreakTick(0.05);
     } else if (e.button === 2) {
-      this.placeBlock();
+      this.doPlaceBlock();
     }
   }
 
@@ -486,7 +500,23 @@ export class MinecraftEngine {
     }
   }
 
-  private placeBlock() {
+  /** 公开方法：UI 按钮触发右键放置 */
+  placeBlock() {
+    this.doPlaceBlock();
+  }
+
+  /** 公开方法：UI 破坏按钮按下时调用 */
+  startBreak() {
+    this.leftDown = true;
+    this.tryBreakTick(0.05);
+  }
+  /** 公开方法：UI 破坏按钮松开时调用 */
+  endBreak() {
+    this.leftDown = false;
+    this.resetBreak();
+  }
+
+  private doPlaceBlock() {
     const hit = this.raycastBlock();
     if (!hit) return;
     const slot = this.hotbar[this.hotbarIndex];
