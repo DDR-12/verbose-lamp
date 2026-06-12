@@ -329,7 +329,7 @@
       x: m.x + m.w / 2 + m.facing * 22,
       y: m.y + 28,
       vx: m.facing * 7,
-      life: 80,
+      life: 200,
       color: m.palette.body,
     });
   }
