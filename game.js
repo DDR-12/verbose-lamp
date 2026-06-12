@@ -339,6 +339,23 @@
       p.x += p.vx;
       p.life--;
     }
+    // 投射物对撞：不同所有者 + 相向运动 + 重叠时互相抵消
+    for (let i = 0; i < projectiles.length; i++) {
+      const a = projectiles[i];
+      if (a.life <= 0) continue;
+      for (let j = i + 1; j < projectiles.length; j++) {
+        const b = projectiles[j];
+        if (b.life <= 0) continue;
+        if (a.owner === b.owner) continue;
+        if (Math.sign(a.vx) === Math.sign(b.vx)) continue; // 需相向
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        if (dx < 14 && dy < 12) {
+          a.life = 0; b.life = 0;
+          hits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, life: 18, kind: 'clash' });
+        }
+      }
+    }
     // 命中判定
     for (const p of projectiles) {
       if (p.life <= 0) continue;
@@ -644,6 +661,18 @@
       ctx.strokeStyle = '#9ee3ff';
       ctx.lineWidth = 2;
       ctx.strokeRect(h.x - a * 2, h.y - a * 2, a * 4, a * 4);
+    } else if (h.kind === 'clash') {
+      // 对撞爆炸：红黄十字 + 外扩方块
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(h.x - a, h.y - 2, a * 2, 4);
+      ctx.fillRect(h.x - 2, h.y - a, 4, a * 2);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(h.x - a + 3, h.y - a + 3, 4, 4);
+      ctx.fillRect(h.x + a - 7, h.y - a + 3, 4, 4);
+      ctx.fillRect(h.x - a + 3, h.y + a - 7, 4, 4);
+      ctx.fillRect(h.x + a - 7, h.y + a - 7, 4, 4);
+      ctx.fillStyle = '#ff4d6d';
+      ctx.fillRect(h.x - 3, h.y - 3, 6, 6);
     }
   }
 
