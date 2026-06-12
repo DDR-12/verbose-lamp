@@ -88,11 +88,13 @@
   // ---------- 游戏状态 ----------
   const game = {
     state: 'ready',          // ready | playing | paused | over
+    mode: 'pve',             // pvp | pve
     round: 1,
     timeLeft: ROUND_TIME,
     timerAccum: 0,
     frame: 0,
     winner: null,
+    aiState: { blockTimer: 0, dashTimer: 0, nextJumpIn: 60, personality: 0.5 },
   };
 
   // ---------- 机甲工厂 ----------
@@ -132,6 +134,8 @@
     p2.facing = -1;
     projectiles = [];
     hits = [];
+    game.aiState.blockTimer = 0;
+    game.aiState.nextJumpIn = 60 + Math.floor(Math.random() * 80);
     game.timeLeft = ROUND_TIME;
     game.timerAccum = 0;
     game.winner = null;
@@ -208,6 +212,7 @@
     }
 
     stepMech(p1, p2, P1_INPUTS);
+    if (game.mode === 'pve') decideAI(p2, p1, P2_INPUTS);
     stepMech(p2, p1, P2_INPUTS);
     stepProjectiles();
     stepHits();
@@ -314,6 +319,65 @@
         m.rangedCD = 55;
         spawnProjectile(m);
       }
+    }
+  }
+
+  // ---------- AI（P2 由电脑控制）----------
+  // 思路：保持 ~250 像素的理想射程 → 用脉冲牵制；贴近用近战；
+  //      看到自己前方的敌方子弹 / 敌方正在挥拳时会防御。
+  function decideAI(me, enemy, map) {
+    // 先清除上一帧 AI 注入的按键（只影响 P2 映射里的键）
+    for (const k of Object.values(map)) keys.delete(k);
+    pressed.delete(map.jump);
+    pressed.delete(map.melee);
+    pressed.delete(map.ranged);
+
+    if (game.state !== 'playing') return;
+
+    const meCx = me.x + me.w / 2;
+    const enemyCx = enemy.x + enemy.w / 2;
+    const dx = enemyCx - meCx;
+    const absDist = Math.abs(dx);
+    const dir = dx >= 0 ? 1 : -1;
+
+    // 1) 移动：保持理想距离 ~250px
+    const preferred = 250;
+    const tooFar = preferred + 30;
+    const tooClose = preferred - 60;
+    if (absDist > tooFar) {
+      if (dir > 0) keys.add(map.right); else keys.add(map.left);
+    } else if (absDist < tooClose) {
+      if (dir > 0) keys.add(map.left); else keys.add(map.right);
+    }
+
+    // 2) 防御：敌方正在挥拳且很近；或敌方子弹正朝我们飞来
+    let wantBlock = false;
+    if (enemy.meleeActive > 0 && absDist < 80) wantBlock = true;
+    for (const p of projectiles) {
+      if (p.owner !== 1) continue;
+      // 子弹朝向我们
+      const bulletGoingRight = p.vx > 0;
+      if (bulletGoingRight && p.x < meCx && p.x > meCx - 220) wantBlock = true;
+      if (!bulletGoingRight && p.x > meCx && p.x < meCx + 220) wantBlock = true;
+    }
+    if (wantBlock && Math.random() < 0.75) keys.add(map.block);
+
+    // 3) 跳跃：随机小跳，偶尔小后撤跳 + 跳跃（躲子弹）
+    game.aiState.nextJumpIn--;
+    if (game.aiState.nextJumpIn <= 0) {
+      pressed.add(map.jump);
+      game.aiState.nextJumpIn = 90 + Math.floor(Math.random() * 120);
+    }
+
+    // 4) 近战：贴脸就挥拳（但受 meleeeCD 控制，不会瞬发多次）
+    if (me.meleeCD === 0 && absDist < 70 && Math.abs(me.y - enemy.y) < 60) {
+      // 面向敌人（通过移动方向会自动让我们面向），直接打
+      pressed.add(map.melee);
+    }
+
+    // 5) 脉冲：在理想距离偶尔射
+    if (!wantBlock && me.rangedCD === 0 && absDist > 140 && absDist < 620) {
+      if (Math.random() < 0.1) pressed.add(map.ranged);
     }
   }
 
@@ -688,6 +752,21 @@
   }
 
   // ---------- 启动 ----------
+  // 模式切换按钮（人机 / 双人）
+  const modeBtn = document.getElementById('mode-btn');
+  const modeText = document.getElementById('mode-text');
+  function syncModeUI() {
+    if (modeText) modeText.textContent = game.mode === 'pve' ? 'P1 vs AI（人机）' : 'P1 vs P2（双人）';
+  }
+  if (modeBtn) {
+    modeBtn.addEventListener('click', () => {
+      game.mode = game.mode === 'pve' ? 'pvp' : 'pve';
+      syncModeUI();
+      resetGame(true);
+    });
+  }
+  syncModeUI();
+
   resetGame(true);
   requestAnimationFrame(loop);
 })();
