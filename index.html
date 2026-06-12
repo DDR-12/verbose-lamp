@@ -229,7 +229,7 @@
 
   // 随机工具
   const rand = (a, b) => a + Math.random() * (b - a);
-  const choice = (arr) => arr[(Math.random() * arr.length) | 0;
+  const choice = (arr) => arr[(Math.random() * arr.length) | 0];
 
   // 鱼的种类：颜色/大小/分值
   const FISH_TYPES = [
@@ -331,39 +331,38 @@
   }
 
   // ---------- 输入 ----------
-  function dropHook() {
-    if (state !== 'playing') return;
-    if (hookState === 'idle') {
-      hookState = 'lowering';
-      hookX = catX + Math.cos(rodAngle) * rodLen;
-      hookY = WATER_Y + 10;
-      hookSpeed = 4;
-      targetDepth = rand(H * 0.55, H - 30);
-    } else if (hookState === 'lowering') {
-      hookState = 'reeling';
-      hookSpeed = -5;
+  function handleInput() {
+    if (state === 'idle' || state === 'over') {
+      startGame();
+      return;
+    }
+    if (state === 'playing') {
+      if (hookState === 'idle') {
+        // 放下鱼钩
+        hookX = catX + Math.cos(rodAngle) * rodLen;
+        hookY = WATER_Y + 10;
+        hookSpeed = 4;
+        targetDepth = rand(H * 0.55, H - 30);
+        hookState = 'lowering';
+      } else if (hookState === 'lowering') {
+        // 立刻收竿
+        hookState = 'reeling';
+        hookSpeed = -5;
+      }
+      // reeling 时忽略输入，等它自动收回
     }
   }
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
       e.preventDefault();
-      if (state === 'idle') startGame();
-      else if (state === 'over') startGame();
-      else dropHook();
+      handleInput();
     }
   });
 
-  canvas.addEventListener('pointerdown', (e) => {
-    if (state === 'idle' || state === 'over') {
-      // 点击遮罩以外的区域不处理（由按钮处理）
-      return;
-    }
-    dropHook();
-  });
-
-  startBtn.addEventListener('click', startGame);
-  restartBtn.addEventListener('click', startGame);
+  canvas.addEventListener('click', handleInput);
+  startBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
+  restartBtn.addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 
   // ---------- 更新 ----------
   function update(dt) {
