@@ -81,8 +81,8 @@
     right: 'ArrowRight',
     jump: 'ArrowUp',
     block: 'ArrowDown',
-    melee: 'Digit1',
-    ranged: 'Digit2',
+    melee: 'BracketLeft',
+    ranged: 'BracketRight',
   };
 
   // ---------- 游戏状态 ----------
