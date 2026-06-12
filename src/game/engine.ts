@@ -42,9 +42,11 @@ export class MinecraftEngine {
   // 输入状态
   private keys = new Set<string>();
   private leftDown = false;   // 左键是否按住（用于持续破坏）
-  private rightLatch = false; // 右键按下计数（单次放置）
   private hotbar: SlotKind[];
   private hotbarIndex = 0;
+  private yawAccum = 0;        // 非锁定模式下的视角输入累积
+  private pitchAccum = 0;
+  private useArrowCamera = false;
 
   // 破坏进度
   private breakTarget: { x: number; y: number; z: number } | null = null;
@@ -146,24 +148,66 @@ export class MinecraftEngine {
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
     document.addEventListener('pointerlockchange', this._onPointerLockChange);
+    document.addEventListener('mozpointerlockchange', this._onPointerLockChange);
+    document.addEventListener('webkitpointerlockchange', this._onPointerLockChange);
     window.addEventListener('resize', this._onResize);
   }
 
+  /** 更健壮的请求指针锁：尝试多种前缀，捕获失败后把游戏切换到“自由模式” */
   private requestLock() {
     const dom = this.renderer.domElement;
     try {
-      if (document.pointerLockElement !== dom) {
-        dom.requestPointerLock?.();
+      if (document.pointerLockElement === dom) return;
+      const fn: any =
+        dom.requestPointerLock ||
+        (dom as any).webkitRequestPointerLock ||
+        (dom as any).mozRequestPointerLock ||
+        (dom as any).msRequestPointerLock;
+      if (fn) {
+        const result = fn.call(dom);
+        if (result && typeof result.catch === 'function') {
+          result.catch((err: any) => {
+            console.warn('[MC] requestPointerLock 失败：', err?.message || err);
+            this.useArrowCamera = true;
+            this.callbacks.onPointerLockChange?.(false);
+          });
+        }
+      } else {
+        console.warn('[MC] 当前浏览器不支持 pointer lock，将使用箭头键转视角。');
+        this.useArrowCamera = true;
+        this.callbacks.onPointerLockChange?.(false);
       }
-    } catch {
-      // 忽略
+    } catch (err: any) {
+      console.warn('[MC] requestPointerLock 异常：', err?.message || err);
+      this.useArrowCamera = true;
+      this.callbacks.onPointerLockChange?.(false);
     }
+  }
+
+  /** 公开方法：允许 React 组件在按钮点击时显式请求锁定 */
+  tryRequestPointerLock() {
+    this.requestLock();
+  }
+
+  /** 公开方法：在任意模式下都能“游玩” */
+  toggleFreeLook() {
+    this.useArrowCamera = !this.useArrowCamera;
+    return this.useArrowCamera;
   }
 
   private onPointerLockChange() {
     const dom = this.renderer.domElement;
-    this.pointerLocked = document.pointerLockElement === dom;
-    this.callbacks.onPointerLockChange?.(this.pointerLocked);
+    const locked =
+      document.pointerLockElement === dom ||
+      (document as any).mozPointerLockElement === dom ||
+      (document as any).webkitPointerLockElement === dom;
+    this.pointerLocked = locked;
+    this.callbacks.onPointerLockChange?.(locked);
+    if (!locked && this.leftDown) {
+      // 失去锁时同时取消破坏状态
+      this.leftDown = false;
+      this.resetBreak();
+    }
   }
 
   private onKeyDown(e: KeyboardEvent) {
@@ -175,6 +219,7 @@ export class MinecraftEngine {
       'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
       'Digit6', 'Digit7', 'Digit8', 'Digit9',
       'KeyF', 'ShiftLeft', 'ShiftRight',
+      'KeyR',
     ];
     if (controlKeys.includes(e.code)) e.preventDefault();
 
@@ -212,11 +257,8 @@ export class MinecraftEngine {
   }
 
   private onMouseDown(e: MouseEvent) {
-    // 锁定鼠标前：左键点击会进入 pointer lock（click 事件处理）
-    // 锁定鼠标后：左键按住持续破坏，右键单次放置
     if (e.button === 0) {
       this.leftDown = true;
-      // 立即先尝试破坏一下，给用户即时反馈
       this.tryBreakTick(0.05);
     } else if (e.button === 2) {
       this.placeBlock();
@@ -227,6 +269,18 @@ export class MinecraftEngine {
     if (e.button === 0) {
       this.leftDown = false;
       this.resetBreak();
+    }
+  }
+
+  /** 外部鼠标移动：锁定模式用 movementX/Y，未锁定模式用箭头键处理 */
+  handleMouseMove(e: MouseEvent) {
+    if (this.pointerLocked) {
+      const sensitivity = 0.0022;
+      this.yaw -= e.movementX * sensitivity;
+      this.pitch -= e.movementY * sensitivity;
+      const lim = Math.PI / 2 - 0.01;
+      if (this.pitch > lim) this.pitch = lim;
+      if (this.pitch < -lim) this.pitch = -lim;
     }
   }
 
@@ -543,8 +597,18 @@ export class MinecraftEngine {
     // 越界防护
     if (this.pos.y < -10) this.pos.copy(this.world.spawnPoint());
 
-    // ==== 视角（鼠标已锁定时用 movementX/Y，未锁定时允许用箭头键看）====
-    // 已在 mousemove 回调处理
+    // ==== 视角（箭头键作为鼠标的兜底，鼠标未锁定也能用）====
+    const ARROW_SPEED = 2.2; // rad/秒
+    if (!this.pointerLocked) {
+      if (this.keys.has('ArrowLeft'))  this.yaw   += ARROW_SPEED * dt;
+      if (this.keys.has('ArrowRight')) this.yaw   -= ARROW_SPEED * dt;
+      if (this.keys.has('ArrowUp'))    this.pitch += ARROW_SPEED * dt;
+      if (this.keys.has('ArrowDown')) this.pitch -= ARROW_SPEED * dt;
+      const lim = Math.PI / 2 - 0.01;
+      if (this.pitch > lim) this.pitch = lim;
+      if (this.pitch < -lim) this.pitch = -lim;
+    }
+
     const lookDir = new THREE.Vector3(
       -Math.sin(this.yaw) * Math.cos(this.pitch),
       Math.sin(this.pitch),
@@ -553,7 +617,7 @@ export class MinecraftEngine {
     this.camera.position.set(this.pos.x, this.pos.y, this.pos.z);
     this.camera.lookAt(this.pos.clone().add(lookDir));
 
-    // ==== 高亮 ====
+    // ==== 高亮（始终显示，鼠标不锁定也能看到目标方块）====
     const hit = this.raycastBlock();
     if (hit) {
       this.highlight.visible = true;
@@ -562,11 +626,9 @@ export class MinecraftEngine {
       this.highlight.visible = false;
     }
 
-    // ==== 持续破坏 ====
-    if (this.leftDown && this.pointerLocked) {
+    // ==== 持续破坏（左键按住即可，不要求鼠标锁定）====
+    if (this.leftDown) {
       this.tryBreakTick(dt);
-    } else if (!this.leftDown) {
-      // 左键没按：保持进度不变（若目标还在）不强制 reset，防止闪烁
     }
   }
 
@@ -578,17 +640,6 @@ export class MinecraftEngine {
     this.update(dt);
     this.renderer.render(this.scene, this.camera);
   };
-
-  // 外部可用：给 Home 组件在 mousemove 时调用
-  handleMouseMove(e: MouseEvent) {
-    if (!this.pointerLocked) return;
-    const sensitivity = 0.0022;
-    this.yaw -= e.movementX * sensitivity;
-    this.pitch -= e.movementY * sensitivity;
-    const lim = Math.PI / 2 - 0.01;
-    if (this.pitch > lim) this.pitch = lim;
-    if (this.pitch < -lim) this.pitch = -lim;
-  }
 
   dispose() {
     cancelAnimationFrame(this.raf);
