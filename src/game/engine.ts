@@ -25,6 +25,8 @@ export interface EngineCallbacks {
     keys: string[];
     onGround: boolean;
     hasMesh: boolean;
+    frameCount: number;
+    error: string | null;
   }) => void;
 }
 
@@ -47,7 +49,7 @@ export class MinecraftEngine {
   private yaw = 0;
   private pitch = 0;
   private onGround = false;
-  private mode: 'walk' | 'fly' = 'walk';
+  private mode: 'walk' | 'fly' = 'fly'; // 默认飞行模式，避免碰撞卡死
 
   // 输入 — 单一 Set，外部（屏幕按钮）+ 内部（键盘事件）共用
   keys = new Set<string>();
@@ -63,6 +65,8 @@ export class MinecraftEngine {
   private lastTime = 0;
   private debugTimer = 0;
   private destroyed = false;
+  private frameCount = 0;
+  private lastError: string | null = null;
 
   // 事件句柄 — 箭头函数绑定（自动保留 this）
   private _onClick = () => this.tryRequestPointerLock();
@@ -229,19 +233,18 @@ export class MinecraftEngine {
   }
 
   private findSafeSpawn(): THREE.Vector3 {
-    // 从世界中心向上找一个 2 格高的空气柱，脚下为实心方块
-    const cx = Math.floor(this.world.sizeX / 2);
-    const cz = Math.floor(this.world.sizeZ / 2);
-    for (let y = this.world.sizeY - 1; y > 0; y--) {
-      const below = this.world.isSolid(cx, y - 1, cz);
-      const air1 = !this.world.isSolid(cx, y, cz);
-      const air2 = !this.world.isSolid(cx, y + 1, cz);
-      if (below && air1 && air2) {
-        // 眼睛位置在 y+1 方块中部
-        return new THREE.Vector3(cx + 0.5, y + PLAYER_EYE_HEIGHT, cz + 0.5);
+    // 在世界中心上方找一个安全位置
+    const cx = Math.floor(this.world.sizeX / 2) + 0.5;
+    const cz = Math.floor(this.world.sizeZ / 2) + 0.5;
+    // 从最高处往下找，但至少保证 y=20 以上（飞行模式不用担心落地）
+    for (let y = this.world.sizeY - 2; y > 5; y--) {
+      if (!this.world.isSolid(Math.floor(cx), y, Math.floor(cz)) &&
+          !this.world.isSolid(Math.floor(cx), y + 1, Math.floor(cz))) {
+        return new THREE.Vector3(cx, y + PLAYER_EYE_HEIGHT, cz);
       }
     }
-    return new THREE.Vector3(cx + 0.5, this.world.sizeY, cz + 0.5);
+    // 兜底：直接在很高的地方
+    return new THREE.Vector3(cx, 30, cz);
   }
 
   private buildHighlight() {
@@ -603,35 +606,57 @@ export class MinecraftEngine {
   private loop = () => {
     if (this.destroyed) return;
     this.rafId = requestAnimationFrame(this.loop);
-    const now = performance.now();
-    let dt = (now - this.lastTime) / 1000;
-    if (dt > 0.1) dt = 0.1; // 避免长时间暂停后的巨大跳跃
-    this.lastTime = now;
 
-    this.update(dt);
+    let dt = 0;
+    try {
+      const now = performance.now();
+      dt = (now - this.lastTime) / 1000;
+      if (dt > 0.1) dt = 0.1;
+      this.lastTime = now;
+      this.frameCount++;
 
-    if (this.renderer && this.scene && this.camera) {
-      this.renderer.render(this.scene, this.camera);
+      this.update(dt);
+
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
+      }
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      this.lastError = msg;
+      console.error('[MC] loop 错误:', msg);
     }
 
-    // 每 ~100ms 推一次调试信息
+    // 调试信息（即使上面出错也要推，这样 UI 能看到错误）
     this.debugTimer += dt;
     if (this.debugTimer > 0.1) {
       this.debugTimer = 0;
-      this.callbacks.onDebug?.({
-        pointerLocked: this.pointerLocked,
-        mode: this.mode,
-        yaw: this.yaw,
-        pitch: this.pitch,
-        pos: { x: this.pos.x, y: this.pos.y, z: this.pos.z },
-        keys: Array.from(this.keys),
-        onGround: this.onGround,
-        hasMesh: this.meshBuilt,
-      });
+      try {
+        this.callbacks.onDebug?.({
+          pointerLocked: this.pointerLocked,
+          mode: this.mode,
+          yaw: this.yaw,
+          pitch: this.pitch,
+          pos: { x: this.pos.x, y: this.pos.y, z: this.pos.z },
+          keys: Array.from(this.keys),
+          onGround: this.onGround,
+          hasMesh: this.meshBuilt,
+          frameCount: this.frameCount,
+          error: this.lastError,
+        });
+      } catch { /* 防止回调报错导致循环崩溃 */ }
     }
   };
 
   private update(dt: number) {
+    try {
+      this._updateInner(dt);
+    } catch (err: any) {
+      this.lastError = 'update: ' + (err?.message || String(err));
+      console.error('[MC] update 错误:', this.lastError);
+    }
+  }
+
+  private _updateInner(dt: number) {
     // === 移动向量（基于 yaw 的前/右方向）===
     const sinYaw = Math.sin(this.yaw);
     const cosYaw = Math.cos(this.yaw);

@@ -10,14 +10,15 @@ export default function Home() {
   const [hotbarIdx, setHotbarIdx] = useState(0);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [mode, setMode] = useState<'walk' | 'fly'>('walk');
+  const [mode, setMode] = useState<'walk' | 'fly'>('fly');
   const [breakInfo, setBreakInfo] = useState<{ pos: { x: number; y: number; z: number } | null; progress: number }>({
     pos: null, progress: 0,
   });
   const [debug, setDebug] = useState<{
     pos: { x: number; y: number; z: number }; keys: string[];
     onGround: boolean; hasMesh: boolean; yaw: number; pitch: number;
-  }>({ pos: { x: 0, y: 0, z: 0 }, keys: [], onGround: false, hasMesh: false, yaw: 0, pitch: 0 });
+    frameCount: number; error: string | null;
+  }>({ pos: { x: 0, y: 0, z: 0 }, keys: [], onGround: false, hasMesh: false, yaw: 0, pitch: 0, frameCount: 0, error: null });
   const [webglOk, setWebglOk] = useState(true);
   const [engineError, setEngineError] = useState<string | null>(null);
 
@@ -199,12 +200,16 @@ export default function Home() {
 
       {/* 调试面板（开始后出现） */}
       {hasStarted && (
-        <div className="pointer-events-none absolute top-24 left-4 text-xs bg-black/50 rounded-lg px-3 py-2 border border-white/20 min-w-[240px]">
-          <div className="font-bold mb-1 text-yellow-300">调试</div>
+        <div className="pointer-events-none absolute top-24 left-4 text-xs bg-black/60 rounded-lg px-3 py-2 border border-white/20 min-w-[260px]">
+          <div className="font-bold mb-1 text-yellow-300">调试信息</div>
+          <div>帧: <b className="text-cyan-300">{debug.frameCount}</b> {debug.frameCount > 0 ? '✅ 循环运行中' : '❌ 循环未启动'}</div>
           <div>pos: {debug.pos.x.toFixed(1)}, {debug.pos.y.toFixed(1)}, {debug.pos.z.toFixed(1)}</div>
           <div>yaw: {debug.yaw.toFixed(2)} · pitch: {debug.pitch.toFixed(2)}</div>
           <div>ground: {String(debug.onGround)} · mesh: {String(debug.hasMesh)}</div>
-          <div className="text-emerald-300">keys: {debug.keys.length > 0 ? debug.keys.join(',') : '(空)'}</div>
+          <div className="text-emerald-300">keys: {debug.keys.length > 0 ? debug.keys.join(', ') : '(空)'}</div>
+          {debug.error && (
+            <div className="text-red-400 mt-1 break-all font-mono text-[10px]">错误: {debug.error}</div>
+          )}
         </div>
       )}
 
