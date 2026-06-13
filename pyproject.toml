@@ -1,0 +1,23 @@
+[project]
+name = "english-book-reader"
+version = "0.1.0"
+description = "Windows desktop app for learning English picture books locally (reverse-engineered from 有声英语绘本 APK)"
+requires-python = ">=3.10"
+authors = [{ name = "Trae IDE" }]
+dependencies = [
+    "PySide6>=6.6.0",
+    "SQLAlchemy>=2.0",
+    "python-dotenv>=1.0",
+    "Pillow>=10.0",
+    "pydub>=0.25.1",
+]
+
+[project.scripts]
+english-book-reader = "main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "app.core", "app.services", "app.ui", "app.ui.pages", "app.ui.widgets"]

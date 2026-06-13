@@ -1,0 +1,196 @@
+/* 童趣暖色调主题 */
+QMainWindow, QDialog, QWidget {
+    background-color: #FFF8EC;
+    color: #3B2C1E;
+    font-family: "Microsoft YaHei", "Segoe UI", "PingFang SC", sans-serif;
+    font-size: 14px;
+}
+
+QFrame#Sidebar {
+    background-color: #FFE9B8;
+    border: none;
+    border-right: 2px solid #F0C75A;
+}
+
+QPushButton#NavButton {
+    background-color: transparent;
+    border: none;
+    padding: 18px 12px;
+    text-align: left;
+    font-size: 16px;
+    color: #5C401B;
+    border-radius: 8px;
+}
+QPushButton#NavButton:hover {
+    background-color: #FFD986;
+}
+QPushButton#NavButton:checked {
+    background-color: #F0A03C;
+    color: white;
+    font-weight: bold;
+}
+
+QPushButton#PrimaryButton {
+    background-color: #F0A03C;
+    color: white;
+    border: none;
+    border-radius: 18px;
+    padding: 10px 24px;
+    font-size: 15px;
+    font-weight: bold;
+}
+QPushButton#PrimaryButton:hover { background-color: #E68A1C; }
+QPushButton#PrimaryButton:pressed { background-color: #C7711A; }
+QPushButton#PrimaryButton:disabled { background-color: #D0BFA8; }
+
+QPushButton#SecondaryButton {
+    background-color: white;
+    color: #5C401B;
+    border: 2px solid #F0C75A;
+    border-radius: 18px;
+    padding: 8px 20px;
+    font-size: 14px;
+}
+QPushButton#SecondaryButton:hover { background-color: #FFF1D6; }
+
+QPushButton#ModeButton {
+    background-color: #FFF1D6;
+    color: #5C401B;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 6px 14px;
+    font-size: 14px;
+}
+QPushButton#ModeButton:checked {
+    background-color: #F0A03C;
+    color: white;
+    border: 2px solid #C7711A;
+}
+
+QListWidget#CategoryList {
+    background: #FFE9B8;
+    border: none;
+    color: #5C401B;
+    font-size: 15px;
+    outline: 0;
+}
+QListWidget#CategoryList::item {
+    padding: 12px 16px;
+    border-radius: 6px;
+}
+QListWidget#CategoryList::item:hover { background: #FFD986; }
+QListWidget#CategoryList::item:selected {
+    background: #F0A03C;
+    color: white;
+    font-weight: bold;
+}
+
+QListView#BookGrid {
+    background: #FFF8EC;
+    border: none;
+}
+QListView#BookGrid::item {
+    background: white;
+    border: 2px solid #F0C75A;
+    border-radius: 12px;
+    padding: 6px;
+}
+QListView#BookGrid::item:selected {
+    border: 3px solid #F0A03C;
+    background: #FFF1D6;
+}
+
+QLineEdit {
+    background: white;
+    border: 2px solid #F0C75A;
+    border-radius: 16px;
+    padding: 6px 14px;
+    selection-background-color: #F0A03C;
+    selection-color: white;
+}
+QLineEdit:focus { border-color: #F0A03C; }
+
+QLabel#BookTitle { font-size: 22px; font-weight: bold; color: #3B2C1E; }
+QLabel#BookSubtitle { font-size: 14px; color: #6B4A1F; }
+QLabel#StatusText { color: #6B4A1F; }
+
+QFrame#ReaderPage {
+    background: #2A2018;
+    border-radius: 12px;
+}
+QLabel#ReaderImage {
+    background: #1A140E;
+    border-radius: 8px;
+    color: #CCC;
+}
+
+QFrame#ReaderToolbar {
+    background: #FFE9B8;
+    border-radius: 16px;
+}
+QPushButton#PageNavButton {
+    background: #F0A03C;
+    color: white;
+    border: none;
+    border-radius: 22px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 18px;
+    font-weight: bold;
+}
+QPushButton#PageNavButton:hover { background: #E68A1C; }
+QPushButton#PageNavButton:disabled { background: #C0A98A; }
+
+QPushButton#ToggleButton {
+    background: #FFF1D6;
+    color: #5C401B;
+    border: 2px solid #F0C75A;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 13px;
+}
+QPushButton#ToggleButton:checked {
+    background: #6FBE6F;
+    color: white;
+    border: 2px solid #4F9E4F;
+}
+
+QProgressBar {
+    background: #FFE9B8;
+    border: none;
+    border-radius: 6px;
+    height: 10px;
+    text-align: center;
+}
+QProgressBar::chunk {
+    background: #F0A03C;
+    border-radius: 6px;
+}
+
+QFrame#WordPopup {
+    background: white;
+    border: 2px solid #F0C75A;
+    border-radius: 12px;
+    padding: 16px;
+}
+QLabel#WordTitle { font-size: 26px; font-weight: bold; color: #F0A03C; }
+QLabel#WordPhonetic { font-size: 14px; color: #6B4A1F; font-style: italic; }
+QLabel#WordTranslation { font-size: 18px; color: #3B2C1E; }
+QLabel#WordExample { font-size: 13px; color: #6B4A1F; }
+
+QFrame#MedalCard {
+    background: white;
+    border: 2px solid #F0C75A;
+    border-radius: 10px;
+}
+QLabel#MedalName { font-size: 14px; font-weight: bold; color: #3B2C1E; }
+QLabel#MedalDate { font-size: 11px; color: #6B4A1F; }
+
+QStatusBar {
+    background: #FFE9B8;
+    color: #5C401B;
+}
+
+QScrollArea { border: none; background: transparent; }
+QScrollBar:vertical { background: #FFF1D6; width: 10px; border-radius: 5px; }
+QScrollBar::handle:vertical { background: #F0C75A; border-radius: 5px; }

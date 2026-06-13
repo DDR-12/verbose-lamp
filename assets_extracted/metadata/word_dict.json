@@ -1,0 +1,67 @@
+{
+  "moon": {
+    "phonetic": "/muːn/",
+    "translation": "月亮",
+    "example": "The moon is bright at night."
+  },
+  "leaf": {
+    "phonetic": "/liːf/",
+    "translation": "叶子",
+    "example": "A green leaf on the tree."
+  },
+  "caterpillar": {
+    "phonetic": "/ˈkætərpɪlər/",
+    "translation": "毛毛虫",
+    "example": "The caterpillar eats leaves."
+  },
+  "bear": {
+    "phonetic": "/beər/",
+    "translation": "熊",
+    "example": "Brown bear in the forest."
+  },
+  "red": {
+    "phonetic": "/red/",
+    "translation": "红色",
+    "example": "A red apple."
+  },
+  "bird": {
+    "phonetic": "/bɜːrd/",
+    "translation": "鸟",
+    "example": "A bird in the sky."
+  },
+  "brown": {
+    "phonetic": "/braʊn/",
+    "translation": "棕色",
+    "example": "Brown hair."
+  },
+  "sunday": {
+    "phonetic": "/ˈsʌndeɪ/",
+    "translation": "星期日",
+    "example": "On Sunday we rest."
+  },
+  "picnic": {
+    "phonetic": "/ˈpɪknɪk/",
+    "translation": "野餐",
+    "example": "Let's have a picnic."
+  },
+  "balloon": {
+    "phonetic": "/bəˈluːn/",
+    "translation": "气球",
+    "example": "A red balloon."
+  },
+  "market": {
+    "phonetic": "/ˈmɑːrkɪt/",
+    "translation": "市场",
+    "example": "Go to the market."
+  },
+  "apple": {
+    "phonetic": "/ˈæpl/",
+    "translation": "苹果",
+    "example": "I like apples."
+  },
+  "egg": {
+    "phonetic": "/eɡ/",
+    "translation": "鸡蛋",
+    "example": "A boiled egg."
+  }
+}
