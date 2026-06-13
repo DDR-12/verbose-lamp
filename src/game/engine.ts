@@ -404,8 +404,9 @@ export class MinecraftEngine {
       if (this.pitch > lim) this.pitch = lim;
       if (this.pitch < -lim) this.pitch = -lim;
     } else if (this.use2d && this.leftDown) {
-      // 2D 模式下，按住左键拖拽转视角
-      if (e.movementX) this.yaw -= e.movementX * 0.005;
+      // 2D 模式下，按住左键拖拽转视角（灵敏度更高）
+      if (e.movementX) this.yaw -= e.movementX * 0.015;
+      if (e.movementY) this.pitch -= e.movementY * 0.015;
     }
   }
 
@@ -683,6 +684,7 @@ export class MinecraftEngine {
         this.renderer2d.playerZ = this.pos.z;
         this.renderer2d.playerY = this.pos.y;
         this.renderer2d.playerYaw = this.yaw;
+        this.renderer2d.playerPitch = this.pitch;
         this.renderer2d.render();
       } else if (this.renderer && this.scene && this.camera) {
         // 3D WebGL 渲染
