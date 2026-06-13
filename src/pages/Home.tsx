@@ -18,7 +18,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#87ceeb] select-none font-sans text-white">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#0a0a14] select-none font-sans text-white">
       <GameCanvas />
       {hasStarted && (
         <>

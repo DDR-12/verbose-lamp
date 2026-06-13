@@ -33,7 +33,7 @@ export class Renderer2D implements GameRenderer {
   init(container: HTMLElement): boolean {
     this.container = container;
     const cvs = document.createElement('canvas');
-    cvs.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+    cvs.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;';
     const ctx = cvs.getContext('2d');
     if (!ctx) {
       console.error('[MC] 2D 渲染器：无法获取 CanvasRenderingContext2D');
@@ -43,8 +43,28 @@ export class Renderer2D implements GameRenderer {
     this.ctx = ctx;
     container.appendChild(cvs);
     this.onResize();
+    // 立即画一帧（让用户看到画面不是空白）
+    this.drawLoadingFrame();
     console.log('[MC] 2D 渲染器初始化成功');
     return true;
+  }
+
+  /** 立即画一帧 loading 画面（防止 init 后到第一帧 render 之间是空白） */
+  private drawLoadingFrame() {
+    if (!this.ctx || !this.canvas) return;
+    const { width, height } = this.canvas;
+    const ctx = this.ctx;
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#87ceeb';
+    ctx.fillRect(0, 0, width, height / 2);
+    ctx.fillStyle = '#3a4a3a';
+    ctx.fillRect(0, height / 2, width, height / 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('2D 渲染器已就绪，正在加载...', width / 2, height / 2 - 10);
+    ctx.fillText('WASD 移动 · 方向键转视角 · F 飞行', width / 2, height / 2 + 14);
   }
 
   onResize() {

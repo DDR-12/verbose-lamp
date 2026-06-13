@@ -44,7 +44,7 @@ export class Renderer3D implements GameRenderer {
     const ch = container.clientHeight || window.innerHeight;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(cw, ch);
-    this.renderer.setClearColor(0x87ceeb);
+    this.renderer.setClearColor(0x2a3a4a);
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -236,21 +236,28 @@ export class Renderer3D implements GameRenderer {
     this.worldGroup = new THREE.Group();
     for (const [t, data] of groups) {
       if (data.positions.length === 0) continue;
-      const tex = blockTexCache.get(t);
-      const mat = new THREE.MeshLambertMaterial({
-        map: tex?.side,
-        // 没有面区分：简化用 side 纹理
-      });
-      void faceTex;
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
-      geom.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
-      geom.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
-      geom.setIndex(data.indices);
-      const mesh = new THREE.Mesh(geom, mat);
-      this.worldGroup.add(mesh);
+      try {
+        const tex = blockTexCache.get(t);
+        const mat = new THREE.MeshLambertMaterial({
+          map: tex?.side,
+        });
+        void faceTex;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
+        geom.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
+        geom.setIndex(data.indices);
+        const mesh = new THREE.Mesh(geom, mat);
+        this.worldGroup.add(mesh);
+      } catch (err) {
+        console.warn('[MC] 跳过方块 mesh:', t, err);
+      }
     }
-    this.scene.add(this.worldGroup);
+    if (this.worldGroup.children.length > 0) {
+      this.scene.add(this.worldGroup);
+    } else {
+      console.warn('[MC] worldGroup 为空（无可见方块）');
+    }
   }
 
   /** 应用昼夜光照 */

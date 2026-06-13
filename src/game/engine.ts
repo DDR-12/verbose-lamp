@@ -33,6 +33,7 @@ export class GameEngine {
   private saveTimer = 0;
   private stepTimer = 0;
   private leftDownAt = 0;
+  private lastRenderError: string | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -49,22 +50,28 @@ export class GameEngine {
     gameActions.setPitch(-0.15);
 
     // 3. 尝试启动 3D 渲染器
-    const r3d = new Renderer3D();
-    if (r3d.init(container)) {
-      this.renderer = r3d;
-      gameActions.setRenderer('3d');
-      console.log('[MC] 使用 3D 渲染器');
-    } else {
-      // 降级到 2D
-      const r2d = new Renderer2D();
-      if (r2d.init(container)) {
-        this.renderer = r2d;
-        gameActions.setRenderer('2d');
-        console.log('[MC] 使用 2D 渲染器（降级）');
-      } else {
-        gameActions.setError('无法启动任何渲染器');
-        return;
+    // 先做轻量级 WebGL 检测（不实例化完整 renderer）
+    const probe = document.createElement('canvas');
+    const webglOK = !!(probe.getContext('webgl2') || probe.getContext('webgl') || probe.getContext('experimental-webgl'));
+    console.log('[MC] WebGL 检测:', webglOK ? '可用' : '不可用');
+    if (webglOK) {
+      try {
+        const r3d = new Renderer3D();
+        if (r3d.init(container)) {
+          this.renderer = r3d;
+          gameActions.setRenderer('3d');
+          console.log('[MC] 使用 3D 渲染器');
+        } else {
+          throw new Error('Renderer3D.init 返回 false');
+        }
+      } catch (err: any) {
+        console.warn('[MC] 3D 启动失败，降级到 2D:', err?.message || err);
+        // 清理可能残留的 dom
+        while (container.firstChild) container.removeChild(container.firstChild);
+        this.tryStart2D(container);
       }
+    } else {
+      this.tryStart2D(container);
     }
 
     // 4. 绑定输入
@@ -157,6 +164,23 @@ export class GameEngine {
     location.reload();
   }
 
+  /** 启动 2D 渲染器 */
+  private tryStart2D(container: HTMLElement): boolean {
+    try {
+      const r2d = new Renderer2D();
+      if (r2d.init(container)) {
+        this.renderer = r2d;
+        gameActions.setRenderer('2d');
+        console.log('[MC] 使用 2D 渲染器（降级）');
+        return true;
+      }
+    } catch (err: any) {
+      console.error('[MC] 2D 渲染器启动异常:', err?.message || err);
+    }
+    gameActions.setError('无法启动任何渲染器');
+    return false;
+  }
+
   private handleResize = () => {
     this.renderer?.onResize();
   };
@@ -179,7 +203,10 @@ export class GameEngine {
       this.render();
     } catch (err: any) {
       const msg = err?.message || String(err);
-      gameActions.setError(msg);
+      // 记录但不阻塞游戏（如果阻塞，玩家就动不了）
+      if (this.lastRenderError !== msg) {
+        this.lastRenderError = msg;
+      }
       console.error('[MC] 主循环错误:', err);
     }
     // 调试信息推送
@@ -199,7 +226,8 @@ export class GameEngine {
   private update(dt: number) {
     const s = useGameStore.getState();
     if (s.paused) return;
-    if (s.error) return;
+    // 注意：不要因为 s.error 就 return —— 那会让玩家无法移动
+    // 即使渲染失败，玩家也应当能操作（破坏/放置用 updatePlayer/raycastBlock，不依赖渲染）
 
     // 1. 处理破坏
     if (s.leftDown) {
@@ -229,19 +257,28 @@ export class GameEngine {
     if (!this.renderer) return;
     const s = useGameStore.getState();
     const slot = s.slots[s.hotbarIndex];
-    this.renderer.render({
-      pos: s.pos,
-      yaw: s.yaw,
-      pitch: s.pitch,
-      vel: s.vel,
-      onGround: s.onGround,
-      mode: s.mode,
-      highlight: s.highlight,
-      breaking: s.breaking,
-      dayTime: s.dayTime,
-      currentSlot: slot,
-      isBreaking: s.leftDown && s.breaking !== null,
-    }, this.world);
+    try {
+      this.renderer.render({
+        pos: s.pos,
+        yaw: s.yaw,
+        pitch: s.pitch,
+        vel: s.vel,
+        onGround: s.onGround,
+        mode: s.mode,
+        highlight: s.highlight,
+        breaking: s.breaking,
+        dayTime: s.dayTime,
+        currentSlot: slot,
+        isBreaking: s.leftDown && s.breaking !== null,
+      }, this.world);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      // 单次渲染错误只 warn，不修改 store.error（避免 setError 后 update 跳过导致玩家无法移动）
+      if (this.lastRenderError !== msg) {
+        this.lastRenderError = msg;
+        console.warn('[MC] 渲染器错误（已忽略，下次再错会继续 warn）:', msg);
+      }
+    }
   }
 
   // ===== 玩家移动 =====
