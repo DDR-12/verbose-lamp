@@ -8,7 +8,9 @@ export default function DebugPanel() {
   const pitch = useGameStore((s) => s.pitch);
   const onGround = useGameStore((s) => s.onGround);
   const mode = useGameStore((s) => s.mode);
-  const keys = useGameStore((s) => Array.from(s.keys));
+  // 关键修复：keys 是个 Set，selector 每次都返回不同引用会触发死循环
+  // 改为只订阅 size，渲染时再展开
+  const keysSize = useGameStore((s) => s.keys.size);
   const renderer = useGameStore((s) => s.renderer);
   const error = useGameStore((s) => s.error);
   const breaking = useGameStore((s) => s.breaking);
@@ -25,7 +27,7 @@ export default function DebugPanel() {
         <div>ground: {String(onGround)} · mode: <b className={mode === 'fly' ? 'text-cyan-300' : 'text-emerald-300'}>{mode}</b></div>
         <div>slot: {hotbarIndex + 1}/{slots.length} <b className="text-yellow-300">{slots[hotbarIndex]?.kind === 'tool' ? '🔧 工具' : '🧱 方块'}</b></div>
       </div>
-      <div className="text-emerald-300 mt-1">keys: <b>{keys.length > 0 ? keys.join(' ') : '(空)'}</b></div>
+      <div className="text-emerald-300 mt-1">按键: <b>{keysSize} 个</b></div>
       {breaking && <div className="text-orange-300">破坏: {Math.round(breaking.progress * 100)}%</div>}
       {error && <div className="text-red-400 break-all font-mono text-[10px] mt-1">⚠ {error}</div>}
     </div>
