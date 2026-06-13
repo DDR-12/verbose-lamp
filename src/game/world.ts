@@ -1,7 +1,6 @@
-import * as THREE from 'three';
-import { BlockType, BLOCKS, BLOCK_SIZE } from './blocks';
+// ===== 世界：体素 + 序列化 + 生成 =====
+import { BLOCKS, type BlockType } from './blocks';
 
-/** 简易伪随机数 —— 用 seed 保证世界可复现 */
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5);
@@ -11,13 +10,11 @@ function mulberry32(seed: number) {
   };
 }
 
-/** 二维平滑噪声（value noise） */
-function smoothNoise2D(rand: () => number, gridX: number, gridZ: number) {
+function smoothNoise2D(gridX: number, gridZ: number) {
   const n = (x: number, z: number) => {
-    // 基于整数坐标的伪随机
     const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
     const v = s - Math.floor(s);
-    return v * 2 - 1; // [-1, 1]
+    return v * 2 - 1;
   };
   const v00 = n(gridX, gridZ);
   const v10 = n(gridX + 1, gridZ);
@@ -32,15 +29,23 @@ function smoothNoise2D(rand: () => number, gridX: number, gridZ: number) {
   return a * (1 - v) + b * v;
 }
 
+export interface SerializedBlock {
+  x: number;
+  y: number;
+  z: number;
+  t: BlockType;
+}
+
 export class World {
   sizeX: number;
   sizeZ: number;
   sizeY: number;
-  /** 一维数组：index = x + z*sizeX + y*sizeX*sizeZ */
   data: BlockType[];
   seed: number;
-  /** 世界左下角原点（x,z 从 0 开始，y 从 0 开始） */
-  origin = new THREE.Vector3(0, 0, 0);
+  /** 标记世界是否被修改（用于增量保存） */
+  dirty: boolean = false;
+  /** 单调递增的版本号：每次 set 自增，渲染器据此判断是否需要重建网格 */
+  version: number = 0;
 
   constructor(sizeX = 48, sizeZ = 48, sizeY = 24, seed = 1337) {
     this.sizeX = sizeX;
@@ -67,45 +72,38 @@ export class World {
   set(x: number, y: number, z: number, type: BlockType) {
     if (!this.inBounds(x, y, z)) return;
     this.data[this.idx(x, y, z)] = type;
+    this.dirty = true;
+    this.version++;
   }
 
-  /** 世界是否是固体 */
   isSolid(x: number, y: number, z: number) {
     const t = this.get(x, y, z);
-    return t !== 'air' && BLOCKS[t].solid;
+    return t !== 'air' && t !== 'water' && BLOCKS[t].solid;
   }
 
   private generate() {
     const rand = mulberry32(this.seed);
-    const cx = this.sizeX / 2;
-    const cz = this.sizeZ / 2;
-
-    // 1. 基础地形高度
-    const heightMap: number[] = new Array(this.sizeX * this.sizeZ).fill(0);
+    const heightMap = new Array(this.sizeX * this.sizeZ).fill(0);
     for (let z = 0; z < this.sizeZ; z++) {
       for (let x = 0; x < this.sizeX; x++) {
-        // 多频率叠加 noise
         let h = 0;
-        h += smoothNoise2D(rand, x * 0.08, z * 0.08) * 4;
-        h += smoothNoise2D(rand, x * 0.18, z * 0.18) * 2;
-        h += smoothNoise2D(rand, x * 0.04, z * 0.04) * 6;
+        h += smoothNoise2D(x * 0.08, z * 0.08) * 4;
+        h += smoothNoise2D(x * 0.18, z * 0.18) * 2;
+        h += smoothNoise2D(x * 0.04, z * 0.04) * 6;
         const ground = Math.floor(this.sizeY * 0.4 + h);
-        heightMap[x + z * this.sizeX] = Math.max(2, Math.min(this.sizeY - 6, ground));
+        heightMap[x + z * this.sizeX] = Math.max(2, Math.min(this.sizeY - 8, ground));
       }
     }
 
-    // 2. 填充方块
     for (let z = 0; z < this.sizeZ; z++) {
       for (let x = 0; x < this.sizeX; x++) {
-        const top = heightMap[x + z * this.sizeZ];
+        const top = heightMap[x + z * this.sizeX];
         for (let y = 0; y <= top; y++) {
           let t: BlockType = 'stone';
           if (y === top) {
-            if (top <= this.sizeY * 0.35) t = 'sand';
-            else t = 'grass';
+            t = top <= this.sizeY * 0.35 ? 'sand' : 'grass';
           } else if (y >= top - 2) {
-            if (top <= this.sizeY * 0.35) t = 'sand';
-            else t = 'dirt';
+            t = top <= this.sizeY * 0.35 ? 'sand' : 'dirt';
           } else {
             t = 'stone';
           }
@@ -114,60 +112,97 @@ export class World {
       }
     }
 
-    // 3. 生成几棵树
-    const treeCount = 10;
+    // 树
+    const treeCount = 12;
     for (let i = 0; i < treeCount; i++) {
       const tx = Math.floor(rand() * (this.sizeX - 8)) + 4;
       const tz = Math.floor(rand() * (this.sizeZ - 8)) + 4;
-      // 找到最高的草方块
       let topY = 0;
       for (let y = this.sizeY - 1; y >= 0; y--) {
-        if (this.get(tx, y, tz) === 'grass') {
-          topY = y;
-          break;
-        }
+        if (this.get(tx, y, tz) === 'grass') { topY = y; break; }
       }
       if (topY === 0) continue;
       const trunkH = 4 + Math.floor(rand() * 2);
-      for (let k = 1; k <= trunkH; k++) {
-        this.set(tx, topY + k, tz, 'wood');
-      }
-      // 叶子
+      for (let k = 1; k <= trunkH; k++) this.set(tx, topY + k, tz, 'wood');
       const leafY = topY + trunkH;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -2; dx <= 2; dx++)
           for (let dz = -2; dz <= 2; dz++) {
             if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-            const lx = tx + dx, ly = leafY + dy, lz = tz + dz;
-            if (this.get(lx, ly, lz) === 'air') this.set(lx, ly, lz, 'leaves');
+            if (this.get(tx + dx, leafY + dy, tz + dz) === 'air') this.set(tx + dx, leafY + dy, tz + dz, 'leaves');
           }
-        }
-      }
-      for (let dx = -1; dx <= 1; dx++) {
+      for (let dx = -1; dx <= 1; dx++)
         for (let dz = -1; dz <= 1; dz++) {
           if (dx === 0 && dz === 0) continue;
-          if (this.get(tx + dx, leafY + 2, tz + dz) === 'air')
-            this.set(tx + dx, leafY + 2, tz + dz, 'leaves');
+          if (this.get(tx + dx, leafY + 2, tz + dz) === 'air') this.set(tx + dx, leafY + 2, tz + dz, 'leaves');
         }
-      }
       if (this.get(tx, leafY + 2, tz) === 'air') this.set(tx, leafY + 2, tz, 'leaves');
     }
   }
 
-  /** 返回玩家出生点（世界中上方某处） */
   spawnPoint() {
     const cx = Math.floor(this.sizeX / 2);
     const cz = Math.floor(this.sizeZ / 2);
-    // 找到最高的实心方块
-    let topY = 0;
     for (let y = this.sizeY - 1; y >= 0; y--) {
-      if (this.isSolid(cx, y, cz)) {
-        topY = y;
-        break;
+      if (this.isSolid(cx, y, cz)) return { x: cx + 0.5, y: y + 1.6, z: cz + 0.5 };
+    }
+    return { x: cx + 0.5, y: 20, z: cz + 0.5 };
+  }
+
+  /** 增量序列化（只保存非默认方块） */
+  serialize(): { sizeX: number; sizeZ: number; sizeY: number; seed: number; diff: SerializedBlock[] } {
+    const diff: SerializedBlock[] = [];
+    // 简化：保存所有非空气方块（也便于完全恢复）
+    for (let y = 0; y < this.sizeY; y++) {
+      for (let z = 0; z < this.sizeZ; z++) {
+        for (let x = 0; x < this.sizeX; x++) {
+          const t = this.get(x, y, z);
+          if (t !== 'air') diff.push({ x, y, z, t });
+        }
       }
     }
-    return new THREE.Vector3(cx + 0.5, topY + 2, cz + 0.5);
+    return { sizeX: this.sizeX, sizeZ: this.sizeZ, sizeY: this.sizeY, seed: this.seed, diff };
+  }
+
+  /** 从 localStorage 恢复（如果保存存在且与默认 seed 一致） */
+  loadFromStorage(): boolean {
+    try {
+      const raw = localStorage.getItem('mc-world-save-v2');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (parsed.sizeX !== this.sizeX || parsed.sizeY !== this.sizeY || parsed.sizeZ !== this.sizeZ) return false;
+      // 重置为全 air
+      this.data = new Array(this.sizeX * this.sizeZ * this.sizeY).fill('air');
+      for (const b of parsed.diff as SerializedBlock[]) {
+        if (this.inBounds(b.x, b.y, b.z)) {
+          this.data[this.idx(b.x, b.y, b.z)] = b.t;
+        }
+      }
+      this.dirty = false;
+      this.version++;
+      console.log('[MC] 从 localStorage 恢复世界:', parsed.diff.length, '个方块');
+      return true;
+    } catch (e) {
+      console.warn('[MC] localStorage 恢复失败:', e);
+      return false;
+    }
+  }
+
+  saveToStorage() {
+    if (!this.dirty) return;
+    try {
+      const data = this.serialize();
+      localStorage.setItem('mc-world-save-v2', JSON.stringify(data));
+      console.log('[MC] 已保存到 localStorage:', data.diff.length, '个方块');
+    } catch (e) {
+      console.warn('[MC] localStorage 保存失败:', e);
+    }
+  }
+
+  clearStorage() {
+    try {
+      localStorage.removeItem('mc-world-save-v2');
+      console.log('[MC] 已清空 localStorage');
+    } catch {}
   }
 }
-
-export { BLOCK_SIZE };
