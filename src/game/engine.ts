@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world';
 import { BlockType, BLOCKS, SlotKind, slotBreakTime } from './blocks';
+import { Renderer2D } from './renderer2d';
 
 const GRAVITY = -22;
 const JUMP_SPEED = 9;
@@ -39,6 +40,8 @@ export class MinecraftEngine {
   private renderer: THREE.WebGLRenderer | null = null;
   private scene: THREE.Scene | null = null;
   private camera: THREE.PerspectiveCamera | null = null;
+  private renderer2d: Renderer2D | null = null; // 2D 备用渲染器
+  private use2d = false; // 是否使用 2D 渲染
 
   private highlight: THREE.LineSegments | null = null;
   private meshBuilt = false;
@@ -188,6 +191,7 @@ export class MinecraftEngine {
       dom.removeEventListener('contextmenu', this._onContextMenu);
     }
     this.renderer?.dispose();
+    this.renderer2d?.dispose();
   }
 
   // ====== 初始化 ======
@@ -196,8 +200,17 @@ export class MinecraftEngine {
     try {
       this.renderer = new THREE.WebGLRenderer({ antialias: true });
     } catch (err: any) {
-      this.showFatal('WebGL 初始化失败：' + (err?.message || err));
-      return false;
+      console.warn('[MC] WebGL 不可用，尝试 2D 备用渲染器...');
+      return this.init2dRenderer();
+    }
+
+    // 检查 WebGL 是否真的能用（有些浏览器不抛异常但上下文为 null）
+    const gl = this.renderer.getContext();
+    if (!gl || gl.isContextLost()) {
+      console.warn('[MC] WebGL 上下文无效，切换到 2D 备用渲染器...');
+      this.renderer.dispose();
+      this.renderer = null;
+      return this.init2dRenderer();
     }
 
     const cw = this.container.clientWidth || window.innerWidth;
@@ -211,7 +224,6 @@ export class MinecraftEngine {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0x87ceeb, 40, 140);
 
-    // 光照：半球光 + 方向光
     const hemi = new THREE.HemisphereLight(0xffffff, 0x3a3a2a, 0.85);
     this.scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -221,7 +233,20 @@ export class MinecraftEngine {
     this.camera = new THREE.PerspectiveCamera(75, cw / ch, 0.1, 500);
     this.camera.position.copy(this.pos);
 
+    console.log('[MC] WebGL 3D 渲染器初始化成功');
     return true;
+  }
+
+  private init2dRenderer(): boolean {
+    try {
+      this.renderer2d = new Renderer2D(this.container, this.world);
+      this.use2d = true;
+      console.log('[MC] 2D 备用渲染器初始化成功');
+      return true;
+    } catch (err: any) {
+      this.showFatal('WebGL 和 2D Canvas 都不可用：' + (err?.message || err));
+      return false;
+    }
   }
 
   private showFatal(msg: string) {
@@ -248,7 +273,7 @@ export class MinecraftEngine {
   }
 
   private buildHighlight() {
-    if (!this.scene) return;
+    if (this.use2d || !this.scene) return;
     const geom = new THREE.BoxGeometry(1.002, 1.002, 1.002);
     const edges = new THREE.EdgesGeometry(geom);
     const mat = new THREE.LineBasicMaterial({ color: 0x111111, linewidth: 2 });
@@ -260,11 +285,17 @@ export class MinecraftEngine {
   // ====== 事件绑定 ======
 
   private bindEvents() {
-    const dom = this.renderer!.domElement;
+    const dom = this.use2d ? null : this.renderer!.domElement;
 
-    // 画布点击 = 请求指针锁定
-    dom.addEventListener('click', this._onClick);
-    dom.addEventListener('contextmenu', this._onContextMenu);
+    // 画布点击 = 请求指针锁定（仅 3D 模式）
+    if (dom) {
+      dom.addEventListener('click', this._onClick);
+      dom.addEventListener('contextmenu', this._onContextMenu);
+    } else {
+      // 2D 模式：点击画布也可以转视角（拖拽）
+      this.container.addEventListener('click', this._onClick);
+      this.container.addEventListener('contextmenu', this._onContextMenu);
+    }
 
     // 鼠标按钮（全局）
     window.addEventListener('mousedown', this._onMouseDown);
@@ -372,10 +403,17 @@ export class MinecraftEngine {
       const lim = Math.PI / 2 - 0.01;
       if (this.pitch > lim) this.pitch = lim;
       if (this.pitch < -lim) this.pitch = -lim;
+    } else if (this.use2d && this.leftDown) {
+      // 2D 模式下，按住左键拖拽转视角
+      if (e.movementX) this.yaw -= e.movementX * 0.005;
     }
   }
 
   private onResize() {
+    if (this.use2d && this.renderer2d) {
+      this.renderer2d.resize();
+      return;
+    }
     if (!this.renderer || !this.camera) return;
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
@@ -387,7 +425,7 @@ export class MinecraftEngine {
   // ====== 网格重建 ======
 
   private rebuildMesh() {
-    if (!this.scene) return;
+    if (this.use2d || !this.scene) return;
 
     // 移除已有的 mesh（高亮框不删除）
     const removeList: THREE.Object3D[] = [];
@@ -502,6 +540,28 @@ export class MinecraftEngine {
   // ====== 射线 & 破坏/放置 ======
 
   private raycastBlock() {
+    if (this.use2d) {
+      // 2D 模式：返回玩家面朝方向最近的实心方块
+      const dx = -Math.sin(this.yaw);
+      const dz = -Math.cos(this.yaw);
+      const px = Math.floor(this.pos.x);
+      const pz = Math.floor(this.pos.z);
+      const py = Math.floor(this.pos.y);
+      for (let dist = 1; dist <= REACH; dist++) {
+        const bx = Math.floor(this.pos.x + dx * dist);
+        const bz = Math.floor(this.pos.z + dz * dist);
+        for (let y = py + 1; y >= py - 1; y--) {
+          if (this.world.isSolid(bx, y, bz)) {
+            return {
+              blockPos: new THREE.Vector3(bx, y, bz),
+              normal: new THREE.Vector3(-Math.sign(dx), 0, -Math.sign(dz)),
+            };
+          }
+        }
+      }
+      return null;
+    }
+
     if (!this.camera || !this.scene) return null;
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
@@ -554,7 +614,7 @@ export class MinecraftEngine {
 
     if (this.breakProgress >= 1) {
       this.world.set(x, y, z, 'air');
-      this.rebuildMesh();
+      if (!this.use2d) this.rebuildMesh();
       this.resetBreak();
     }
   }
@@ -574,7 +634,7 @@ export class MinecraftEngine {
     if (this.world.get(nx, ny, nz) !== 'air') return;
 
     this.world.set(nx, ny, nz, slot.type);
-    this.rebuildMesh();
+    if (!this.use2d) this.rebuildMesh();
   }
 
   private playerOccupies(bx: number, by: number, bz: number) {
@@ -617,7 +677,15 @@ export class MinecraftEngine {
 
       this.update(dt);
 
-      if (this.renderer && this.scene && this.camera) {
+      if (this.use2d && this.renderer2d) {
+        // 2D 备用渲染
+        this.renderer2d.playerX = this.pos.x;
+        this.renderer2d.playerZ = this.pos.z;
+        this.renderer2d.playerY = this.pos.y;
+        this.renderer2d.playerYaw = this.yaw;
+        this.renderer2d.render();
+      } else if (this.renderer && this.scene && this.camera) {
+        // 3D WebGL 渲染
         this.renderer.render(this.scene, this.camera);
       }
     } catch (err: any) {
