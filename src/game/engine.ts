@@ -132,16 +132,32 @@ export class GameEngine {
   /** 屏幕按钮触发：放置方块 */
   placeBlock() {
     const hit = this.raycastBlock();
-    if (!hit) return;
+    if (!hit) {
+      gameActions.setSaveMessage('✗ 放置失败：先看向一个方块');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
     const slot = useGameStore.getState().slots[useGameStore.getState().hotbarIndex];
-    if (slot.kind !== 'block') return;
-    if (slot.type === 'air' || slot.type === 'water') return;
+    if (slot.kind !== 'block') {
+      gameActions.setSaveMessage('✗ 放置失败：当前槽是工具（切到方块槽 1-6）');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
+    if (slot.type === 'air' || slot.type === 'water') {
+      gameActions.setSaveMessage('✗ 放置失败：空气/水不能放');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
     const nx = hit.blockPos.x + hit.normal.x;
     const ny = hit.blockPos.y + hit.normal.y;
     const nz = hit.blockPos.z + hit.normal.z;
     if (!this.world.inBounds(nx, ny, nz)) return;
     const s = useGameStore.getState();
-    if (this.playerOccupies(nx, ny, nz, s.pos)) return;
+    if (this.playerOccupies(nx, ny, nz, s.pos)) {
+      gameActions.setSaveMessage('✗ 放置失败：位置被你身体占用');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
     if (this.world.get(nx, ny, nz) !== 'air') return;
     this.world.set(nx, ny, nz, slot.type);
     audio.place(BLOCKS[slot.type].soundFreq);

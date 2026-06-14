@@ -59,6 +59,7 @@ export class InputManager {
     window.addEventListener('mousemove', this.onMouseMove);
     window.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mouseup', this.onMouseUp);
+    window.addEventListener('contextmenu', this.onContextMenu);
     window.addEventListener('wheel', this.onWheel, { passive: false });
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
     // 全局错误捕获
@@ -138,6 +139,16 @@ export class InputManager {
     }
   };
 
+  private onContextMenu = (e: MouseEvent) => {
+    // 阻止浏览器右键菜单，让 onMouseDown(button=2) 顺利触发
+    if (e.target instanceof HTMLElement && e.target.closest('input, textarea')) return;
+    e.preventDefault();
+    // 同时触发一次 onRightClick（覆盖某些场景：浏览器吞掉 mousedown-2）
+    if (!(e.target instanceof HTMLElement) || !e.target.closest('button')) {
+      this.callbacks.onRightClick?.();
+    }
+  };
+
   private onMouseUp = (e: MouseEvent) => {
     if (e.target instanceof HTMLElement && e.target.closest('button')) return;
     if (e.button === 0) {
@@ -189,6 +200,7 @@ export class InputManager {
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mouseup', this.onMouseUp);
+    window.removeEventListener('contextmenu', this.onContextMenu);
     window.removeEventListener('wheel', this.onWheel);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
   }
