@@ -1,0 +1,259 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #1A110B;
+  color: #F4E1B7;
+}
+
+/* === 复古木纹背景 === */
+.bg-wood {
+  background-color: #3E2A1E;
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.12) 0px,
+      rgba(0,0,0,0.12) 1px,
+      transparent 1px,
+      transparent 5px),
+    repeating-linear-gradient(0deg,
+      rgba(255,255,255,0.04) 0px,
+      rgba(255,255,255,0.04) 1px,
+      transparent 1px,
+      transparent 18px),
+    radial-gradient(ellipse at top left, #5B3A1B 0%, #3E2A1E 50%, #2A1C13 100%);
+}
+
+.bg-felt {
+  background-color: #2C5F3D;
+  background-image:
+    radial-gradient(ellipse at center, #3a7250 0%, #2C5F3D 60%, #1f4530 100%),
+    repeating-radial-gradient(circle at 30% 20%, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 4px);
+  background-blend-mode: overlay;
+}
+
+/* === 3D 立体按钮 === */
+.btn-3d {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.75rem;
+  font-family: "ZCOOL KuaiLe", "Noto Sans TC", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff8e1;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.35);
+  background: linear-gradient(180deg, #E8C56A 0%, #C99A47 60%, #A37332 100%);
+  border: 2px solid #5B3A1B;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 0 #5B3A1B,
+    0 6px 10px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.btn-3d:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 #5B3A1B,
+    0 8px 14px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  filter: brightness(1.05);
+}
+.btn-3d:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 2px 0 #5B3A1B,
+    0 3px 5px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.btn-3d:disabled {
+  filter: grayscale(0.6) brightness(0.7);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.btn-crimson {
+  background: linear-gradient(180deg, #E85A56 0%, #C73E3A 60%, #8B2A28 100%);
+  border-color: #4A1816;
+  box-shadow:
+    0 4px 0 #4A1816,
+    0 6px 10px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn-crimson:hover:not(:disabled) { box-shadow: 0 6px 0 #4A1816, 0 8px 14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4); }
+.btn-crimson:active:not(:disabled) { box-shadow: 0 2px 0 #4A1816, 0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4); }
+
+.btn-jade {
+  background: linear-gradient(180deg, #4A8B5E 0%, #2C5F3D 60%, #1A3D26 100%);
+  border-color: #0F2A18;
+  box-shadow:
+    0 4px 0 #0F2A18,
+    0 6px 10px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn-jade:hover:not(:disabled) { box-shadow: 0 6px 0 #0F2A18, 0 8px 14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4); }
+.btn-jade:active:not(:disabled) { box-shadow: 0 2px 0 #0F2A18, 0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4); }
+
+.btn-royal {
+  background: linear-gradient(180deg, #4A6FA8 0%, #2A4A7F 60%, #1A3057 100%);
+  border-color: #0E1F3A;
+  box-shadow:
+    0 4px 0 #0E1F3A,
+    0 6px 10px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn-royal:hover:not(:disabled) { box-shadow: 0 6px 0 #0E1F3A, 0 8px 14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4); }
+.btn-royal:active:not(:disabled) { box-shadow: 0 2px 0 #0E1F3A, 0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4); }
+
+/* === 骰子 3D 容器 === */
+.dice-3d {
+  width: 64px;
+  height: 64px;
+  position: relative;
+  transform-style: preserve-3d;
+  perspective: 400px;
+}
+.dice-face {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #fff8e1 0%, #E8C56A 100%);
+  border: 2px solid #5B3A1B;
+  border-radius: 12px;
+  display: grid;
+  padding: 8px;
+  box-shadow:
+    inset 0 -4px 6px rgba(0,0,0,0.2),
+    inset 0 2px 3px rgba(255,255,255,0.6),
+    0 4px 6px rgba(0,0,0,0.3);
+}
+.dice-face .pip {
+  background: #3E2A1E;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* === 卡片 3D 翻转 === */
+.card-3d {
+  perspective: 1000px;
+}
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+.card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.card-back {
+  transform: rotateY(180deg);
+}
+
+/* === 棋子脉动光圈 === */
+.piece-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+.piece-active .piece-ring {
+  animation: ringPulse 1.4s ease-out infinite;
+}
+@keyframes ringPulse {
+  0%   { transform: scale(0.85); opacity: 0.8; }
+  100% { transform: scale(1.6);  opacity: 0; }
+}
+
+/* === 资金变化动画 === */
+.cash-flash {
+  animation: cashFlash 0.6s ease-out;
+}
+@keyframes cashFlash {
+  0%   { color: #fff; transform: scale(1.2); }
+  100% { color: inherit; transform: scale(1); }
+}
+
+/* === 滚动条美化 === */
+.custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #A37332; border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: #C99A47; }
+
+/* === 棋盘格高亮 === */
+.tile-highlight {
+  box-shadow: 0 0 0 3px #E8C56A, 0 0 16px rgba(232,197,106,0.6);
+  z-index: 5;
+}
+
+/* === 文字光晕 === */
+.text-glow-gold {
+  text-shadow: 0 0 8px rgba(232,197,106,0.6), 2px 2px 0 rgba(0,0,0,0.5);
+}
+.text-glow-red {
+  text-shadow: 0 0 8px rgba(232,90,86,0.6), 2px 2px 0 rgba(0,0,0,0.5);
+}
+
+/* === 缩小按钮 === */
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #E8C56A 0%, #A37332 100%);
+  border: 2px solid #5B3A1B;
+  border-radius: 8px;
+  color: #2A1C13;
+  box-shadow: 0 3px 0 #5B3A1B;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.btn-icon:hover { transform: translateY(-1px); box-shadow: 0 4px 0 #5B3A1B; }
+.btn-icon:active { transform: translateY(2px); box-shadow: 0 1px 0 #5B3A1B; }
+.btn-icon:disabled { filter: grayscale(0.7) brightness(0.8); cursor: not-allowed; }
+
+/* 庆祝彩带 */
+.confetti {
+  position: absolute;
+  width: 8px;
+  height: 14px;
+  pointer-events: none;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
