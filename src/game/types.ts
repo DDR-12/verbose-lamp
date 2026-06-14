@@ -50,6 +50,8 @@ export interface GameState {
   saveMenuOpen: boolean;
   saveMessage: string | null;
   blockCount: number;
+  /** 玩家在开始界面选择的存档槽位（0/1/2），引擎启动时读取 */
+  pendingSlot: number;
 }
 
 export type Vec3Array = [number, number, number];

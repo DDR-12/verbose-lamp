@@ -1,4 +1,4 @@
-// ===== 开始界面：3 个存档槽位 + 新游戏 =====
+// ===== 开始界面：3 个存档槽位，自动存档 =====
 import { useState, useEffect } from 'react';
 import { useGameStore, gameActions } from '../game/store';
 import { World } from '../game/world';
@@ -15,7 +15,6 @@ export default function StartScreen() {
   const renderer = useGameStore((s) => s.renderer);
   const error = useGameStore((s) => s.error);
   const [slots, setSlots] = useState<(SlotInfo | null)[]>([null, null, null]);
-  const [saveName, setSaveName] = useState('');
 
   useEffect(() => {
     if (!hasStarted) setSlots(World.listSlots());
@@ -41,31 +40,21 @@ export default function StartScreen() {
     );
   }
 
-  // 新游戏：直接开始（玩家进入后按 E 主动保存到指定槽位）
-  const startNew = (slot: number) => {
-    if (slots[slot] && !confirm(`存档 ${slot + 1} 已有内容 "${slots[slot]!.name}"，是否覆盖？`)) return;
-    // 清掉自动保存，确保世界是干净的
-    try { localStorage.removeItem('mc-world-save-v2'); } catch {}
+  // 选好槽位后，引擎启动时自动从该槽位加载（继续）或生成新世界（开始）
+  const startGame = (slot: number, mode: 'continue' | 'new') => {
+    if (mode === 'continue' && !slots[slot]) return;
+    if (mode === 'new' && slots[slot] && !confirm(`存档 ${slot + 1} 已有内容 "${slots[slot]!.name}"，开始新游戏会清空它。继续？`)) return;
+    if (mode === 'new') {
+      // 真正清空该槽位（让引擎从空世界开始）
+      World.deleteSlot(slot);
+      try { localStorage.removeItem('mc-world-save-v2'); } catch {}
+    }
+    gameActions.setPendingSlot(slot);
     gameActions.setHasStarted(true);
-    // 进入后稍等引擎初始化再保存
+    // 进入后请求指针锁定
     setTimeout(() => {
-      const eng = (window as any).__mc?.engine;
-      if (eng?.quickSave) eng.quickSave(slot, saveName || `存档 ${slot + 1}`);
-    }, 600);
-    (window as any).__mc?.input?.requestPointerLock?.();
-  };
-
-  // 继续：加载该槽位并开始
-  const loadSlot = (slot: number) => {
-    if (!slots[slot]) return;
-    // 先重置 world（清空自动保存），再让引擎从该槽位加载
-    try { localStorage.removeItem('mc-world-save-v2'); } catch {}
-    gameActions.setHasStarted(true);
-    setTimeout(() => {
-      const eng = (window as any).__mc?.engine;
-      if (eng?.quickLoad) eng.quickLoad(slot);
-    }, 600);
-    (window as any).__mc?.input?.requestPointerLock?.();
+      (window as any).__mc?.input?.requestPointerLock?.();
+    }, 500);
   };
 
   const deleteSlot = (slot: number, e: React.MouseEvent) => {
@@ -96,7 +85,7 @@ export default function StartScreen() {
 
         {/* 存档槽位 */}
         <div className="space-y-2 mb-4">
-          <div className="text-xs text-white/60 font-semibold">📂 存档槽位（3 个）</div>
+          <div className="text-xs text-white/60 font-semibold">📂 选择存档（退出时自动保存到当前槽位）</div>
           {slots.map((s, i) => (
             <div
               key={i}
@@ -120,7 +109,7 @@ export default function StartScreen() {
               </div>
               {s && (
                 <button
-                  onClick={() => loadSlot(i)}
+                  onClick={() => startGame(i, 'continue')}
                   className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold whitespace-nowrap"
                 >
                   继续
@@ -136,32 +125,20 @@ export default function StartScreen() {
                 </button>
               )}
               <button
-                onClick={() => startNew(i)}
+                onClick={() => startGame(i, 'new')}
                 className="px-3 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold whitespace-nowrap"
               >
-                {s ? '覆盖' : '新游戏 →'}
+                {s ? '新游戏' : '新游戏 →'}
               </button>
             </div>
           ))}
-        </div>
-
-        {/* 存档名输入 */}
-        <div className="mb-4">
-          <label className="text-xs text-white/60">新存档名（可选）：</label>
-          <input
-            type="text"
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            placeholder="例如：我的基地"
-            className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-800 border border-white/15 text-sm focus:outline-none focus:border-cyan-500"
-          />
         </div>
 
         {/* 操作提示 */}
         <div className="text-xs text-white/55 leading-relaxed border-t border-white/10 pt-3">
           <b className="text-amber-300">操作：</b> WASD 移动 · 方向键转视角 · Space 跳跃 · F 飞行
           <br />
-          左键破坏 · 右键放置 · 1-9 切槽 · <b className="text-cyan-300">E</b> 弹出保存菜单
+          左键破坏 · 右键放置 · 1-9 切槽 · 退出时自动保存到当前槽位
         </div>
       </div>
     </div>

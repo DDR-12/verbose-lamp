@@ -30,18 +30,28 @@ export class GameEngine {
   private destroyed = false;
   private frameCount = 0;
   private debugTimer = 0;
-  private saveTimer = 0;
-  private stepTimer = 0;
   private leftDownAt = 0;
   private lastRenderError: string | null = null;
+  /** 当前正在玩的存档槽位（0/1/2），退出时自动保存到此槽位 */
+  private currentSlot: number = 0;
+  /** 浏览器关闭/刷新时同步存档 */
+  private handleBeforeUnload: () => void = () => {};
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, slot: number = 0) {
     this.container = container;
+    this.currentSlot = slot;
 
-    // 1. 加载世界（小世界 8x8x8，初始只有 1 个 1x1 平台）
+    // 1. 加载世界（小世界 8x8x8）
     this.world = new World(8, 8, 8, 1337);
-    const loaded = this.world.loadFromStorage();
-    console.log('[MC] 世界加载:', loaded ? '从存档恢复' : '新生成');
+    // 优先：尝试从指定槽位加载
+    const slotLoaded = this.world.loadFromSlot(slot);
+    if (slotLoaded) {
+      console.log(`[MC] 从槽位 ${slot} 加载世界`);
+    } else {
+      // 没存档就清掉旧自动存档（防止脏数据残留）
+      try { localStorage.removeItem('mc-world-save-v2'); } catch {}
+      console.log('[MC] 新生成世界');
+    }
 
     // 2. 设置玩家出生点
     const sp = this.world.spawnPoint();
@@ -122,6 +132,15 @@ export class GameEngine {
     // 监听窗口尺寸变化
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
+
+    // 浏览器关闭/刷新时强制同步存档（dispose 异步不可靠）
+    this.handleBeforeUnload = () => {
+      try {
+        this.world.saveToSlot(this.currentSlot, `存档 ${this.currentSlot + 1}`);
+        console.log('[MC] beforeunload 自动存档到槽位', this.currentSlot);
+      } catch {}
+    };
+    window.addEventListener('beforeunload', this.handleBeforeUnload);
 
     // 5. 启动主循环
     this.lastTime = performance.now();
@@ -340,12 +359,6 @@ export class GameEngine {
       this.debugTimer = 0;
       gameActions.setFrameCount(this.frameCount);
       gameActions.setBlockCount(this.world.countBlocks());
-    }
-    // 自动保存（每 5 秒）
-    this.saveTimer += dt;
-    if (this.saveTimer > 5) {
-      this.saveTimer = 0;
-      this.world.saveToStorage();
     }
   };
 
@@ -620,10 +633,17 @@ export class GameEngine {
   dispose() {
     this.destroyed = true;
     cancelAnimationFrame(this.rafId);
-    this.world.saveToStorage();
+    // 退出时自动存档到当前槽位
+    try {
+      const ok = this.world.saveToSlot(this.currentSlot, `存档 ${this.currentSlot + 1}`);
+      console.log(`[MC] 退出自动存档到槽位 ${this.currentSlot}：${ok ? '成功' : '失败'}`);
+    } catch (e) {
+      console.warn('[MC] 退出自动存档异常:', e);
+    }
     this.renderer?.dispose();
     inputManager.dispose();
     window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('beforeunload', this.handleBeforeUnload);
     (window as any).__mc = null;
   }
 }

@@ -29,6 +29,8 @@ export const useGameStore = create<GameState>(() => ({
   saveMenuOpen: false,
   saveMessage: null,
   blockCount: 0,
+  /** 玩家选择的存档槽位（0/1/2），引擎创建时读取 */
+  pendingSlot: 0,
 }));
 
 // 单独暴露 setters（避免循环依赖）
@@ -52,6 +54,7 @@ export const gameActions = {
   setSaveMenuOpen: (v: boolean) => useGameStore.setState({ saveMenuOpen: v }),
   setSaveMessage: (m: string | null) => useGameStore.setState({ saveMessage: m }),
   setBlockCount: (n: number) => useGameStore.setState({ blockCount: n }),
+  setPendingSlot: (s: number) => useGameStore.setState({ pendingSlot: s }),
   setPointerLocked: (v: boolean) => useGameStore.setState({ pointerLocked: v }),
   setLeftDown: (v: boolean) => useGameStore.setState({ leftDown: v }),
   addKey: (k: string) => {

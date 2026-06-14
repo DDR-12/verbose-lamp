@@ -8,13 +8,16 @@ import { useGameStore, gameActions } from '../game/store';
 export default function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const hasStarted = useGameStore((s) => s.hasStarted);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
+    if (!hasStarted) return; // 等用户点开始
     let engine: GameEngine | null = null;
     try {
-      engine = new GameEngine(containerRef.current);
+      const slot = useGameStore.getState().pendingSlot;
+      engine = new GameEngine(containerRef.current, slot);
       engineRef.current = engine;
       setReady(true);
     } catch (err: any) {
@@ -25,7 +28,7 @@ export default function GameCanvas() {
       engine?.dispose();
       engineRef.current = null;
     };
-  }, []);
+  }, [hasStarted]);
 
   return (
     <div
