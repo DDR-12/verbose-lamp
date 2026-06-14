@@ -47,6 +47,8 @@ export interface GameState {
   hasStarted: boolean;
   paused: boolean;
   error: string | null;
+  saveMenuOpen: boolean;
+  saveMessage: string | null;
 }
 
 export type Vec3Array = [number, number, number];

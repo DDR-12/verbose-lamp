@@ -47,7 +47,7 @@ export class World {
   /** 单调递增的版本号：每次 set 自增，渲染器据此判断是否需要重建网格 */
   version: number = 0;
 
-  constructor(sizeX = 48, sizeZ = 48, sizeY = 24, seed = 1337) {
+  constructor(sizeX = 8, sizeZ = 8, sizeY = 8, seed = 1337) {
     this.sizeX = sizeX;
     this.sizeZ = sizeZ;
     this.sizeY = sizeY;
@@ -82,62 +82,16 @@ export class World {
   }
 
   private generate() {
-    const rand = mulberry32(this.seed);
-    const heightMap = new Array(this.sizeX * this.sizeZ).fill(0);
-    for (let z = 0; z < this.sizeZ; z++) {
-      for (let x = 0; x < this.sizeX; x++) {
-        let h = 0;
-        h += smoothNoise2D(x * 0.08, z * 0.08) * 4;
-        h += smoothNoise2D(x * 0.18, z * 0.18) * 2;
-        h += smoothNoise2D(x * 0.04, z * 0.04) * 6;
-        const ground = Math.floor(this.sizeY * 0.4 + h);
-        heightMap[x + z * this.sizeX] = Math.max(2, Math.min(this.sizeY - 8, ground));
-      }
-    }
-
-    for (let z = 0; z < this.sizeZ; z++) {
-      for (let x = 0; x < this.sizeX; x++) {
-        const top = heightMap[x + z * this.sizeX];
-        for (let y = 0; y <= top; y++) {
-          let t: BlockType = 'stone';
-          if (y === top) {
-            t = top <= this.sizeY * 0.35 ? 'sand' : 'grass';
-          } else if (y >= top - 2) {
-            t = top <= this.sizeY * 0.35 ? 'sand' : 'dirt';
-          } else {
-            t = 'stone';
-          }
-          this.set(x, y, z, t);
-        }
-      }
-    }
-
-    // 树
-    const treeCount = 12;
-    for (let i = 0; i < treeCount; i++) {
-      const tx = Math.floor(rand() * (this.sizeX - 8)) + 4;
-      const tz = Math.floor(rand() * (this.sizeZ - 8)) + 4;
-      let topY = 0;
-      for (let y = this.sizeY - 1; y >= 0; y--) {
-        if (this.get(tx, y, tz) === 'grass') { topY = y; break; }
-      }
-      if (topY === 0) continue;
-      const trunkH = 4 + Math.floor(rand() * 2);
-      for (let k = 1; k <= trunkH; k++) this.set(tx, topY + k, tz, 'wood');
-      const leafY = topY + trunkH;
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -2; dx <= 2; dx++)
-          for (let dz = -2; dz <= 2; dz++) {
-            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-            if (this.get(tx + dx, leafY + dy, tz + dz) === 'air') this.set(tx + dx, leafY + dy, tz + dz, 'leaves');
-          }
-      for (let dx = -1; dx <= 1; dx++)
-        for (let dz = -1; dz <= 1; dz++) {
-          if (dx === 0 && dz === 0) continue;
-          if (this.get(tx + dx, leafY + 2, tz + dz) === 'air') this.set(tx + dx, leafY + 2, tz + dz, 'leaves');
-        }
-      if (this.get(tx, leafY + 2, tz) === 'air') this.set(tx, leafY + 2, tz, 'leaves');
-    }
+    // 小世界：只放一个 1x1 平台作为出生点，周围全部是空气
+    // 玩家可以自由破坏/放置来扩展
+    const cx = Math.floor(this.sizeX / 2);
+    const cz = Math.floor(this.sizeZ / 2);
+    const groundY = Math.max(1, Math.floor(this.sizeY * 0.5));
+    // 平台：草方块作为顶部，下方 2 层是泥土，最下层是石头
+    this.set(cx, groundY, cz, 'grass');
+    this.set(cx, groundY - 1, cz, 'dirt');
+    this.set(cx, groundY - 2, cz, 'dirt');
+    this.set(cx, groundY - 3, cz, 'stone');
   }
 
   spawnPoint() {
@@ -198,6 +152,88 @@ export class World {
       console.warn('[MC] localStorage 保存失败:', e);
     }
   }
+
+  /** 保存到指定槽位（用于多存档） */
+  saveToSlot(slot: number, name: string) {
+    try {
+      const data = this.serialize();
+      const meta = {
+        name,
+        timestamp: Date.now(),
+        sizeX: this.sizeX,
+        sizeY: this.sizeY,
+        sizeZ: this.sizeZ,
+        seed: this.seed,
+        blockCount: data.diff.length,
+      };
+      localStorage.setItem(`mc-save-${slot}-meta`, JSON.stringify(meta));
+      localStorage.setItem(`mc-save-${slot}-data`, JSON.stringify(data));
+      this.dirty = false;
+      console.log(`[MC] 存档 ${slot} ("${name}") 已保存，${data.diff.length} 个方块`);
+      return true;
+    } catch (e) {
+      console.warn(`[MC] 存档 ${slot} 保存失败:`, e);
+      return false;
+    }
+  }
+
+  /** 从指定槽位加载 */
+  loadFromSlot(slot: number): boolean {
+    try {
+      const raw = localStorage.getItem(`mc-save-${slot}-data`);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      // 校验 size
+      if (parsed.sizeX !== this.sizeX || parsed.sizeY !== this.sizeY || parsed.sizeZ !== this.sizeZ) {
+        console.warn(`[MC] 存档 ${slot} size 不匹配 (${parsed.sizeX}x${parsed.sizeY}x${parsed.sizeZ})，跳过`);
+        return false;
+      }
+      this.data = new Array(this.sizeX * this.sizeZ * this.sizeY).fill('air');
+      for (const b of parsed.diff as SerializedBlock[]) {
+        if (this.inBounds(b.x, b.y, b.z)) {
+          this.data[this.idx(b.x, b.y, b.z)] = b.t;
+        }
+      }
+      this.dirty = false;
+      this.version++;
+      console.log(`[MC] 从槽位 ${slot} 加载，${parsed.diff.length} 个方块`);
+      return true;
+    } catch (e) {
+      console.warn(`[MC] 存档 ${slot} 加载失败:`, e);
+      return false;
+    }
+  }
+
+  /** 列出所有存档槽位（包含元数据） */
+  static listSlots(): Array<{ slot: number; name: string; timestamp: number; blockCount: number } | null> {
+    const out: Array<{ slot: number; name: string; timestamp: number; blockCount: number } | null> = [];
+    for (let s = 0; s < 3; s++) {
+      try {
+        const raw = localStorage.getItem(`mc-save-${s}-meta`);
+        if (!raw) {
+          out.push(null);
+          continue;
+        }
+        const m = JSON.parse(raw);
+        out.push({ slot: s, name: m.name, timestamp: m.timestamp, blockCount: m.blockCount });
+      } catch {
+        out.push(null);
+      }
+    }
+    return out;
+  }
+
+  /** 删除指定槽位 */
+  static deleteSlot(slot: number) {
+    try {
+      localStorage.removeItem(`mc-save-${slot}-meta`);
+      localStorage.removeItem(`mc-save-${slot}-data`);
+      console.log(`[MC] 存档 ${slot} 已删除`);
+    } catch {}
+  }
+
+  /** 当前世界是否已修改 */
+  isDirty() { return this.dirty; }
 
   clearStorage() {
     try {

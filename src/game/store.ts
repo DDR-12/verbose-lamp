@@ -4,7 +4,7 @@ import type { GameState } from './types';
 import { DEFAULT_HOTBAR } from './hotbar';
 
 export const useGameStore = create<GameState>(() => ({
-  pos: { x: 24.5, y: 30, z: 24.5 },
+  pos: { x: 4.5, y: 8, z: 4.5 },
   vel: { x: 0, y: 0, z: 0 },
   yaw: 0,
   pitch: -0.15,
@@ -26,6 +26,8 @@ export const useGameStore = create<GameState>(() => ({
   hasStarted: false,
   paused: false,
   error: null,
+  saveMenuOpen: false,
+  saveMessage: null,
 }));
 
 // 单独暴露 setters（避免循环依赖）
@@ -46,6 +48,8 @@ export const gameActions = {
   setHasStarted: (v: boolean) => useGameStore.setState({ hasStarted: v }),
   setPaused: (v: boolean) => useGameStore.setState({ paused: v }),
   setError: (e: string | null) => useGameStore.setState({ error: e }),
+  setSaveMenuOpen: (v: boolean) => useGameStore.setState({ saveMenuOpen: v }),
+  setSaveMessage: (m: string | null) => useGameStore.setState({ saveMessage: m }),
   setPointerLocked: (v: boolean) => useGameStore.setState({ pointerLocked: v }),
   setLeftDown: (v: boolean) => useGameStore.setState({ leftDown: v }),
   addKey: (k: string) => {

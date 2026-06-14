@@ -38,8 +38,8 @@ export class GameEngine {
   constructor(container: HTMLElement) {
     this.container = container;
 
-    // 1. 加载世界
-    this.world = new World(48, 48, 24, 1337);
+    // 1. 加载世界（小世界 8x8x8，初始只有 1 个 1x1 平台）
+    this.world = new World(8, 8, 8, 1337);
     const loaded = this.world.loadFromStorage();
     console.log('[MC] 世界加载:', loaded ? '从存档恢复' : '新生成');
 
@@ -162,6 +162,32 @@ export class GameEngine {
   resetWorld() {
     this.world.clearStorage();
     location.reload();
+  }
+
+  /** 快速保存到指定槽位 */
+  quickSave(slot: number, name: string) {
+    const ok = this.world.saveToSlot(slot, name);
+    const ts = new Date();
+    const fmt = `${ts.getHours()}:${String(ts.getMinutes()).padStart(2, '0')}`;
+    gameActions.setSaveMessage(ok ? `✓ 槽位 ${slot + 1} "${name}" 已保存 (${fmt})` : `✗ 保存失败`);
+    gameActions.setSaveMenuOpen(false);
+    setTimeout(() => gameActions.setSaveMessage(null), 2500);
+    return ok;
+  }
+
+  /** 快速加载指定槽位 */
+  quickLoad(slot: number) {
+    const ok = this.world.loadFromSlot(slot);
+    // 重置玩家位置到出生点
+    const sp = this.world.spawnPoint();
+    gameActions.setPos(sp.x, sp.y, sp.z);
+    gameActions.setVel(0, 0, 0);
+    gameActions.setBreaking(null);
+    gameActions.setHighlight(null);
+    gameActions.setSaveMessage(ok ? `✓ 已加载槽位 ${slot + 1}` : `✗ 加载失败`);
+    gameActions.setSaveMenuOpen(false);
+    setTimeout(() => gameActions.setSaveMessage(null), 2500);
+    return ok;
   }
 
   /** 启动 2D 渲染器 */

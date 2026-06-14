@@ -95,6 +95,15 @@ export class InputManager {
       this.callbacks.onToggleMode?.();
     } else if (code === 'KeyR') {
       this.callbacks.onRespawn?.();
+    } else if (code === 'KeyE') {
+      // 切换保存菜单
+      const cur = useGameStore.getState();
+      gameActions.setSaveMenuOpen(!cur.saveMenuOpen);
+    } else if (code === 'Escape') {
+      // 关闭保存菜单（如果有）
+      if (useGameStore.getState().saveMenuOpen) {
+        gameActions.setSaveMenuOpen(false);
+      }
     } else if (/^Digit[1-9]$/.test(code)) {
       const idx = parseInt(code.replace('Digit', ''), 10) - 1;
       if (idx < DEFAULT_HOTBAR.length) this.callbacks.onHotbarDigit?.(idx);
