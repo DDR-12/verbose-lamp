@@ -29,6 +29,7 @@ interface TileProps {
 
 function Tile({ tile, index, isCurrent, playersHere }: TileProps) {
   const pos = TILE_POSITIONS[index];
+  if (!pos) return null;
   const left = PADDING + pos.col * (TILE_SIZE + GAP);
   const top = PADDING + pos.row * (TILE_SIZE + GAP);
   const isCorner = (pos.row === 0 || pos.row === 10) && (pos.col === 0 || pos.col === 10);

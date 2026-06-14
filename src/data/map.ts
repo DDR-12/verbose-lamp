@@ -87,18 +87,17 @@ export const TAIWAN_MAP: Tile[] = [
 ];
 
 // 格子在棋盘上的位置（11x11 网格）- 经典 36 格环绕
-// 0 在右下角起，顺时针
+// 0 起点 = (10, 10) 右下角
 // 边缘坐标 (row, col) (0-10)
 export const TILE_POSITIONS: { row: number; col: number; dir: 'top' | 'bottom' | 'left' | 'right' }[] = (() => {
   const arr: { row: number; col: number; dir: 'top' | 'bottom' | 'left' | 'right' }[] = [];
-  // 0 起点 = (10, 10) 右下角
-  // 底部 1-8: 从右到左 (col 9..2) at row 10
+  // 底部 0-8: 起点 + 8 格，从右到左 (col 10..2) at row 10
   for (let i = 0; i <= 8; i++) arr.push({ row: 10, col: 10 - i, dir: 'bottom' });
-  // 左侧 9-17: 从下到上 (row 9..2) at col 0
-  for (let i = 1; i <= 8; i++) arr.push({ row: 10 - i, col: 0, dir: 'left' });
-  // 顶部 18-26: 从左到右 (col 1..9) at row 0
+  // 左侧 9-17: 从下到上 (row 9..1) at col 0 — 9 格
+  for (let i = 1; i <= 9; i++) arr.push({ row: 10 - i, col: 0, dir: 'left' });
+  // 顶部 18-26: 从左到右 (col 1..9) at row 0 — 9 格
   for (let i = 1; i <= 9; i++) arr.push({ row: 0, col: i, dir: 'top' });
-  // 右侧 27-35: 从上到下 (row 1..8) at col 10
-  for (let i = 1; i <= 8; i++) arr.push({ row: i, col: 10, dir: 'right' });
+  // 右侧 27-35: 从上到下 (row 1..9) at col 10 — 9 格
+  for (let i = 1; i <= 9; i++) arr.push({ row: i, col: 10, dir: 'right' });
   return arr;
 })();
