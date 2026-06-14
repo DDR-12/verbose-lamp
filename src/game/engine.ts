@@ -36,6 +36,8 @@ export class GameEngine {
   private currentSlot: number = 0;
   /** 浏览器关闭/刷新时同步存档 */
   private handleBeforeUnload: () => void = () => {};
+  /** 暂停状态：StartScreen 显示期间为 true，点开始后变 false */
+  private paused: boolean = true;
 
   constructor(container: HTMLElement, slot: number = 0) {
     this.container = container;
@@ -145,7 +147,25 @@ export class GameEngine {
     // 5. 启动主循环
     this.lastTime = performance.now();
     this.rafId = requestAnimationFrame(this.loop);
-    console.log('[MC] 引擎主循环启动');
+    console.log('[MC] 引擎主循环启动（paused 等用户点开始）');
+  }
+
+  /** 由 StartScreen 调用：正式开始游戏（解除 paused） */
+  start() {
+    this.paused = false;
+    this.lastTime = performance.now();
+    console.log('[MC] 引擎已解除暂停');
+  }
+
+  /** 由 StartScreen 调用：开始新游戏（重置世界） */
+  resetNewWorld() {
+    this.world = new World(8, 8, 8, 1337);
+    this.world.set(Math.floor(this.world.sizeX / 2), Math.max(1, Math.floor(this.world.sizeY * 0.5)), Math.floor(this.world.sizeZ / 2), 'grass');
+    const sp = this.world.spawnPoint();
+    gameActions.setPos(sp.x, sp.y, sp.z);
+    gameActions.setVel(0, 0, 0);
+    gameActions.setBlockCount(this.world.countBlocks());
+    console.log('[MC] 引擎已重置为新世界');
   }
 
   /** 屏幕按钮触发：放置方块 */
@@ -295,6 +315,7 @@ export class GameEngine {
 
   /** 快速加载指定槽位 */
   quickLoad(slot: number) {
+    this.currentSlot = slot;
     const ok = this.world.loadFromSlot(slot);
     // 重置玩家位置到出生点
     const sp = this.world.spawnPoint();
@@ -302,9 +323,8 @@ export class GameEngine {
     gameActions.setVel(0, 0, 0);
     gameActions.setBreaking(null);
     gameActions.setHighlight(null);
-    gameActions.setSaveMessage(ok ? `✓ 已加载槽位 ${slot + 1}` : `✗ 加载失败`);
-    gameActions.setSaveMenuOpen(false);
-    setTimeout(() => gameActions.setSaveMessage(null), 2500);
+    gameActions.setBlockCount(this.world.countBlocks());
+    console.log(`[MC] 引擎已加载槽位 ${slot}：${ok ? '成功' : '失败'}`);
     return ok;
   }
 
@@ -363,6 +383,7 @@ export class GameEngine {
   };
 
   private update(dt: number) {
+    if (this.paused) return;
     const s = useGameStore.getState();
     if (s.paused) return;
     // 注意：不要因为 s.error 就 return —— 那会让玩家无法移动

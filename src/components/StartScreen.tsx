@@ -40,21 +40,31 @@ export default function StartScreen() {
     );
   }
 
-  // 选好槽位后，引擎启动时自动从该槽位加载（继续）或生成新世界（开始）
+  // 选好槽位后，引擎已经在底层 paused 等待
   const startGame = (slot: number, mode: 'continue' | 'new') => {
     if (mode === 'continue' && !slots[slot]) return;
     if (mode === 'new' && slots[slot] && !confirm(`存档 ${slot + 1} 已有内容 "${slots[slot]!.name}"，开始新游戏会清空它。继续？`)) return;
+    const eng = (window as any).__mc?.engine;
+    if (!eng) {
+      gameActions.setError('引擎未就绪');
+      return;
+    }
     if (mode === 'new') {
-      // 真正清空该槽位（让引擎从空世界开始）
+      // 清掉该槽位旧存档 + 让引擎重置为新世界
       World.deleteSlot(slot);
       try { localStorage.removeItem('mc-world-save-v2'); } catch {}
+      eng.resetNewWorld();
+    } else {
+      // 继续：从该槽位加载
+      eng.quickLoad(slot);
     }
     gameActions.setPendingSlot(slot);
+    eng.start(); // 解除 paused
     gameActions.setHasStarted(true);
     // 进入后请求指针锁定
     setTimeout(() => {
       (window as any).__mc?.input?.requestPointerLock?.();
-    }, 500);
+    }, 300);
   };
 
   const deleteSlot = (slot: number, e: React.MouseEvent) => {
