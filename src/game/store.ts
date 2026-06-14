@@ -4,7 +4,7 @@ import type { GameState } from './types';
 import { DEFAULT_HOTBAR } from './hotbar';
 
 export const useGameStore = create<GameState>(() => ({
-  pos: { x: 4.5, y: 8, z: 4.5 },
+  pos: { x: 4.5, y: 6.6, z: 4.5 },
   vel: { x: 0, y: 0, z: 0 },
   yaw: 0,
   pitch: -0.15,

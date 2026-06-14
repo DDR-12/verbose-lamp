@@ -98,7 +98,7 @@ export class World {
     const cx = Math.floor(this.sizeX / 2);
     const cz = Math.floor(this.sizeZ / 2);
     for (let y = this.sizeY - 1; y >= 0; y--) {
-      if (this.isSolid(cx, y, cz)) return { x: cx + 0.5, y: y + 1.6, z: cz + 0.5 };
+      if (this.isSolid(cx, y, cz)) return { x: cx + 0.5, y: y + 1 + 1.6, z: cz + 0.5 };
     }
     return { x: cx + 0.5, y: 20, z: cz + 0.5 };
   }
