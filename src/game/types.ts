@@ -49,6 +49,7 @@ export interface GameState {
   error: string | null;
   saveMenuOpen: boolean;
   saveMessage: string | null;
+  blockCount: number;
 }
 
 export type Vec3Array = [number, number, number];

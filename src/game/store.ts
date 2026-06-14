@@ -28,6 +28,7 @@ export const useGameStore = create<GameState>(() => ({
   error: null,
   saveMenuOpen: false,
   saveMessage: null,
+  blockCount: 0,
 }));
 
 // 单独暴露 setters（避免循环依赖）
@@ -50,6 +51,7 @@ export const gameActions = {
   setError: (e: string | null) => useGameStore.setState({ error: e }),
   setSaveMenuOpen: (v: boolean) => useGameStore.setState({ saveMenuOpen: v }),
   setSaveMessage: (m: string | null) => useGameStore.setState({ saveMessage: m }),
+  setBlockCount: (n: number) => useGameStore.setState({ blockCount: n }),
   setPointerLocked: (v: boolean) => useGameStore.setState({ pointerLocked: v }),
   setLeftDown: (v: boolean) => useGameStore.setState({ leftDown: v }),
   addKey: (k: string) => {

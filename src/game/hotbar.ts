@@ -10,9 +10,9 @@ export const DEFAULT_HOTBAR: Slot[] = [
   { kind: 'block', type: 'wood' as BlockType },
   { kind: 'block', type: 'plank' as BlockType },
   { kind: 'block', type: 'brick' as BlockType },
+  { kind: 'block', type: 'water' as BlockType },
   { kind: 'tool', type: 'axe' as ToolType },
   { kind: 'tool', type: 'pickaxe' as ToolType },
-  { kind: 'tool', type: 'shovel' as ToolType },
 ];
 
 export function slotLabel(slot: Slot): string {

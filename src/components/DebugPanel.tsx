@@ -16,6 +16,7 @@ export default function DebugPanel() {
   const breaking = useGameStore((s) => s.breaking);
   const hotbarIndex = useGameStore((s) => s.hotbarIndex);
   const slots = useGameStore((s) => s.slots);
+  const blockCount = useGameStore((s) => s.blockCount);
 
   return (
     <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-30 text-xs bg-black/65 rounded-lg px-3 py-2 border border-white/20 min-w-[280px]">
@@ -27,7 +28,7 @@ export default function DebugPanel() {
         <div>ground: {String(onGround)} · mode: <b className={mode === 'fly' ? 'text-cyan-300' : 'text-emerald-300'}>{mode}</b></div>
         <div>slot: {hotbarIndex + 1}/{slots.length} <b className="text-yellow-300">{slots[hotbarIndex]?.kind === 'tool' ? '🔧 工具' : '🧱 方块'}</b></div>
       </div>
-      <div className="text-emerald-300 mt-1">按键: <b>{keysSize} 个</b></div>
+      <div className="text-emerald-300 mt-1">按键: <b>{keysSize} 个</b> · 方块总数: <b className="text-amber-300">{blockCount}</b></div>
       {breaking && <div className="text-orange-300">破坏: {Math.round(breaking.progress * 100)}%</div>}
       {error && <div className="text-red-400 break-all font-mono text-[10px] mt-1">⚠ {error}</div>}
     </div>

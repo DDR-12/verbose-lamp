@@ -131,36 +131,119 @@ export class GameEngine {
 
   /** 屏幕按钮触发：放置方块 */
   placeBlock() {
+    // 优先：看向已存在的方块 → 在 normal 面放置
+    // 兜底：看向空气 → 视线方向落点放置
+    let nx = 0, ny = 0, nz = 0;
+    let placed = false;
     const hit = this.raycastBlock();
-    if (!hit) {
-      gameActions.setSaveMessage('✗ 放置失败：先看向一个方块');
-      setTimeout(() => gameActions.setSaveMessage(null), 1500);
-      return;
+    if (hit) {
+      nx = hit.blockPos.x + hit.normal.x;
+      ny = hit.blockPos.y + hit.normal.y;
+      nz = hit.blockPos.z + hit.normal.z;
+      placed = true;
+    } else {
+      // 看向空气：沿视线方向走 5 格，再从该点往下找最近地面
+      const s = useGameStore.getState();
+      const dx = -Math.sin(s.yaw) * Math.cos(s.pitch);
+      const dy = Math.sin(s.pitch);
+      const dz = -Math.cos(s.yaw) * Math.cos(s.pitch);
+      // 视线末端
+      const ex = s.pos.x + dx * 5;
+      const ey = s.pos.y + dy * 5;
+      const ez = s.pos.z + dz * 5;
+      // 从 ey 开始往下找第一个 air（非碰撞）的方块位置
+      const startY = Math.max(0, Math.min(this.world.sizeY - 1, Math.floor(ey)));
+      const fx = Math.floor(ex);
+      const fz = Math.floor(ez);
+      // 找 (fx, ?, fz) 上方最近的 air
+      let foundY = -1;
+      for (let y = startY; y >= 0; y--) {
+        if (this.world.isSolid(fx, y, fz)) {
+          foundY = y + 1; // 该方块上方一格
+          break;
+        }
+      }
+      if (foundY < 0) {
+        // 整个列都是空气：找下方第一个非空气
+        for (let y = 0; y < this.world.sizeY; y++) {
+          if (this.world.isSolid(fx, y, fz)) {
+            foundY = y + 1;
+            break;
+          }
+        }
+        if (foundY < 0) {
+          // 完全空的世界：放在玩家脚下同一层
+          foundY = Math.max(0, Math.floor(s.pos.y - 1.6));
+        }
+      }
+      nx = fx; ny = foundY; nz = fz;
+      placed = true;
     }
+    if (!placed) return;
+
     const slot = useGameStore.getState().slots[useGameStore.getState().hotbarIndex];
     if (slot.kind !== 'block') {
       gameActions.setSaveMessage('✗ 放置失败：当前槽是工具（切到方块槽 1-6）');
       setTimeout(() => gameActions.setSaveMessage(null), 1500);
       return;
     }
-    if (slot.type === 'air' || slot.type === 'water') {
-      gameActions.setSaveMessage('✗ 放置失败：空气/水不能放');
+    if (slot.type === 'air') {
+      gameActions.setSaveMessage('✗ 放置失败：空气不能放');
       setTimeout(() => gameActions.setSaveMessage(null), 1500);
       return;
     }
-    const nx = hit.blockPos.x + hit.normal.x;
-    const ny = hit.blockPos.y + hit.normal.y;
-    const nz = hit.blockPos.z + hit.normal.z;
-    if (!this.world.inBounds(nx, ny, nz)) return;
+    if (!this.world.inBounds(nx, ny, nz)) {
+      gameActions.setSaveMessage('✗ 放置失败：超出世界边界');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
     const s = useGameStore.getState();
     if (this.playerOccupies(nx, ny, nz, s.pos)) {
       gameActions.setSaveMessage('✗ 放置失败：位置被你身体占用');
       setTimeout(() => gameActions.setSaveMessage(null), 1500);
       return;
     }
-    if (this.world.get(nx, ny, nz) !== 'air') return;
+    if (this.world.get(nx, ny, nz) !== 'air') {
+      // 已有方块，尝试"贴脸放"：找 (nx,ny,nz) 周围 6 个相邻 air
+      const airNeighbor = this.findNearestAir(nx, ny, nz);
+      if (airNeighbor) {
+        const [ax, ay, az] = airNeighbor;
+        if (!this.playerOccupies(ax, ay, az, s.pos) && this.world.get(ax, ay, az) === 'air') {
+          this.world.set(ax, ay, az, slot.type);
+          audio.place(BLOCKS[slot.type].soundFreq);
+          return;
+        }
+      }
+      gameActions.setSaveMessage('✗ 放置失败：目标位置已占');
+      setTimeout(() => gameActions.setSaveMessage(null), 1500);
+      return;
+    }
     this.world.set(nx, ny, nz, slot.type);
     audio.place(BLOCKS[slot.type].soundFreq);
+  }
+
+  /** 找 (x,y,z) 周围 6 个相邻 air（按距离 + 视线方向优先） */
+  private findNearestAir(x: number, y: number, z: number): [number, number, number] | null {
+    const s = useGameStore.getState();
+    const dx = -Math.sin(s.yaw) * Math.cos(s.pitch);
+    const dy = Math.sin(s.pitch);
+    const dz = -Math.cos(s.yaw) * Math.cos(s.pitch);
+    const dirs = [
+      [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+    ];
+    // 按"与视线方向夹角"排序
+    dirs.sort((a, b) => {
+      const da = a[0] * dx + a[1] * dy + a[2] * dz;
+      const db = b[0] * dx + b[1] * dy + b[2] * dz;
+      return db - da;
+    });
+    for (const [ox, oy, oz] of dirs) {
+      const ax = x + ox, ay = y + oy, az = z + oz;
+      if (this.world.inBounds(ax, ay, az) && this.world.get(ax, ay, az) === 'air') {
+        return [ax, ay, az];
+      }
+    }
+    return null;
   }
 
   /** 屏幕按钮触发：开始破坏 */
@@ -256,6 +339,7 @@ export class GameEngine {
     if (this.debugTimer > 0.1) {
       this.debugTimer = 0;
       gameActions.setFrameCount(this.frameCount);
+      gameActions.setBlockCount(this.world.countBlocks());
     }
     // 自动保存（每 5 秒）
     this.saveTimer += dt;

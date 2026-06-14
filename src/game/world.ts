@@ -118,6 +118,15 @@ export class World {
     return { sizeX: this.sizeX, sizeZ: this.sizeZ, sizeY: this.sizeY, seed: this.seed, diff };
   }
 
+  /** 统计当前世界非空气方块总数（用于 UI 显示） */
+  countBlocks(): number {
+    let n = 0;
+    for (let i = 0; i < this.data.length; i++) {
+      if (this.data[i] !== 'air') n++;
+    }
+    return n;
+  }
+
   /** 从 localStorage 恢复（如果保存存在且与默认 seed 一致） */
   loadFromStorage(): boolean {
     try {
